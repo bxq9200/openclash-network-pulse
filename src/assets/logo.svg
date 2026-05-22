@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="Network Pulse logo">
+  <defs>
+    <linearGradient id="glass" x1="38" x2="218" y1="28" y2="228" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff" stop-opacity=".88"/>
+      <stop offset=".28" stop-color="#8bbcff" stop-opacity=".86"/>
+      <stop offset=".66" stop-color="#2f75ff" stop-opacity=".88"/>
+      <stop offset="1" stop-color="#1751dc" stop-opacity=".95"/>
+    </linearGradient>
+    <linearGradient id="pulse" x1="60" x2="200" y1="140" y2="88" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#ffffff"/>
+    </linearGradient>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feColorMatrix in="blur" values="0 0 0 0 0.18 0 0 0 0 0.46 0 0 0 0 1 0 0 0 .72 0"/>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <rect width="256" height="256" rx="58" fill="#f5f9ff"/>
+  <rect x="18" y="18" width="220" height="220" rx="48" fill="url(#glass)" opacity=".3"/>
+  <rect x="28" y="28" width="200" height="200" rx="42" fill="#2f75ff" opacity=".94"/>
+  <path d="M55 139h31l15-42 25 79 28-96 18 59h29" fill="none" stroke="url(#pulse)" stroke-linecap="round" stroke-linejoin="round" stroke-width="14" filter="url(#glow)"/>
+  <path d="M66 76h42l43 70V76h39v104h-42l-43-70v70H66V76Z" fill="#f8fffd" opacity=".96"/>
+  <path d="M66 76h42l43 70V76h39v104h-42l-43-70v70H66V76Z" fill="#ffffff" opacity=".18"/>
+</svg>

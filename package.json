@@ -1,0 +1,76 @@
+{
+  "name": "openclash-desktop-widget",
+  "version": "1.0.0",
+  "description": "A cross-platform desktop widget for OpenClash / Mihomo network status and proxy switching.",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "icon": "node scripts/build-icon.js",
+    "prepack": "npm run icon",
+    "predist": "npm run icon",
+    "dist": "electron-builder",
+    "dist:win": "electron-builder --win",
+    "dist:mac": "electron-builder --mac",
+    "dist:linux": "electron-builder --linux",
+    "pack": "electron-builder --dir"
+  },
+  "keywords": [
+    "electron",
+    "openclash",
+    "clash",
+    "desktop-widget"
+  ],
+  "author": "bxq9200",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/bxq9200/openclash-network-pulse.git"
+  },
+  "homepage": "https://github.com/bxq9200/openclash-network-pulse#readme",
+  "bugs": {
+    "url": "https://github.com/bxq9200/openclash-network-pulse/issues"
+  },
+  "build": {
+    "appId": "local.openclash.network-pulse",
+    "productName": "Network Pulse",
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "icon": "src/assets/logo.ico",
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Network Pulse"
+    },
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "category": "public.app-category.utilities"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Network"
+    }
+  },
+  "devDependencies": {
+    "electron": "^31.7.7",
+    "electron-builder": "^24.13.3"
+  }
+}

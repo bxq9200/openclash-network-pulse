@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OpenClash Widget</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body class="theme-glass">
+    <main class="shell">
+      <header class="titlebar">
+        <section class="identity">
+          <div class="sigil"><img src="../assets/logo.png" alt="OpenClash Control" /></div>
+          <div class="eyebrow" data-i18n="eyebrow">OPENCLASH 控制台</div>
+        </section>
+
+        <section class="topline">
+          <span id="apiStatus" class="status-pill">...</span>
+          <span id="updatedAt">--:--:--</span>
+          <button id="refreshBtn" class="icon-button" title="Refresh" aria-label="Refresh">
+            <svg viewBox="0 0 24 24"><path d="M20 6v5h-5"/><path d="M19 11a7 7 0 1 0-2.1 5"/></svg>
+          </button>
+          <button id="settingsBtn" class="icon-button" title="Settings" aria-label="Settings">
+            <svg viewBox="0 0 24 24"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"/><path d="M19.4 15a1.8 1.8 0 0 0 .36 2l.04.04a2 2 0 1 1-2.83 2.83l-.04-.04a1.8 1.8 0 0 0-2-.36 1.8 1.8 0 0 0-1.1 1.65V21a2 2 0 1 1-4 0v-.06A1.8 1.8 0 0 0 8.7 19.3a1.8 1.8 0 0 0-2 .36l-.04.04a2 2 0 1 1-2.83-2.83l.04-.04a1.8 1.8 0 0 0 .36-2 1.8 1.8 0 0 0-1.65-1.1H2.5a2 2 0 1 1 0-4h.06A1.8 1.8 0 0 0 4.2 8.7a1.8 1.8 0 0 0-.36-2l-.04-.04A2 2 0 1 1 6.63 3.8l.04.04a1.8 1.8 0 0 0 2 .36h.02A1.8 1.8 0 0 0 9.8 2.55V2.5a2 2 0 1 1 4 0v.06a1.8 1.8 0 0 0 1.1 1.65 1.8 1.8 0 0 0 2-.36l.04-.04a2 2 0 1 1 2.83 2.83l-.04.04a1.8 1.8 0 0 0-.36 2v.02a1.8 1.8 0 0 0 1.65 1.1h.06a2 2 0 1 1 0 4h-.06A1.8 1.8 0 0 0 19.4 15Z"/></svg>
+          </button>
+          <button id="minBtn" class="icon-button" title="Minimize" aria-label="Minimize">
+            <svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg>
+          </button>
+          <button id="closeBtn" class="icon-button" title="Hide to tray" aria-label="Hide to tray">
+            <svg viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+          </button>
+        </section>
+      </header>
+
+      <section class="deck">
+        <aside class="left-rail">
+          <section class="hero-panel">
+            <div>
+              <span class="label" data-i18n="activeCore">当前核心</span>
+              <strong id="coreStatus">UNKNOWN</strong>
+            </div>
+            <div>
+              <span class="label" data-i18n="liveConn">实时连接</span>
+              <strong id="connStatus">0</strong>
+            </div>
+          </section>
+
+          <section class="speed-panel">
+            <div class="speed-card up">
+              <span><svg class="mini-icon" viewBox="0 0 24 24"><path d="m12 5 6 6"/><path d="m12 5-6 6"/><path d="M12 5v14"/></svg><span data-i18n="upload">上传</span></span>
+              <strong id="uploadSpeed">0 KB/s</strong>
+              <svg class="wave" id="uploadWave" viewBox="0 0 180 42" preserveAspectRatio="none"></svg>
+            </div>
+            <div class="speed-card down">
+              <span><svg class="mini-icon" viewBox="0 0 24 24"><path d="m12 19 6-6"/><path d="m12 19-6-6"/><path d="M12 5v14"/></svg><span data-i18n="download">下载</span></span>
+              <strong id="downloadSpeed">0 KB/s</strong>
+              <svg class="wave" id="downloadWave" viewBox="0 0 180 42" preserveAspectRatio="none"></svg>
+            </div>
+          </section>
+
+          <section class="probe-panel">
+            <div class="panel-head">
+              <h2 data-i18n="routeProbes">线路探测</h2>
+              <span id="probeSummary">0/0</span>
+            </div>
+            <div id="probes" class="probe-list"></div>
+          </section>
+
+          <section class="current-node-panel">
+            <div class="panel-head">
+              <h2 data-i18n="activeNode">当前节点</h2>
+              <span id="healthText">--</span>
+            </div>
+            <strong id="activeNodeText">--</strong>
+            <span id="controllerText">--</span>
+          </section>
+        </aside>
+
+        <section class="command-panel">
+          <div class="panel-head command-head">
+            <div>
+              <h2 data-i18n="proxyGroups">代理策略组</h2>
+              <span id="groupCount">0</span>
+            </div>
+            <div class="toolbar">
+              <label class="search-wrap">
+                <svg viewBox="0 0 24 24"><path d="m21 21-4.3-4.3"/><circle cx="11" cy="11" r="7"/></svg>
+                <input id="groupSearch" class="group-search" data-i18n-placeholder="search" placeholder="搜索策略组或节点" />
+              </label>
+              <button id="sortDelayBtn" class="toggle-btn" title="Sort tested nodes by delay">
+                <svg viewBox="0 0 24 24"><path d="M4 7h11"/><path d="M4 12h8"/><path d="M4 17h5"/><path d="m17 14 3 3 3-3"/><path d="M20 7v10"/></svg>
+                <span data-i18n="delaySort">延迟排序</span>
+              </button>
+            </div>
+          </div>
+          <div id="groups" class="groups"></div>
+        </section>
+      </section>
+
+      <section id="settings" class="settings hidden">
+        <div class="settings-shell">
+          <aside class="settings-side">
+            <span data-i18n="preferences">偏好设置</span>
+            <strong data-i18n="settingsTitle">控制台设置</strong>
+            <p data-i18n="settingsDesc">调整连接信息、界面风格和启动行为。</p>
+          </aside>
+
+          <div class="settings-content">
+            <div class="settings-bar">
+              <h2 data-i18n="appearance">外观与连接</h2>
+              <button id="saveSettingsBtn" data-i18n="save">保存</button>
+            </div>
+
+            <section class="settings-section">
+              <div class="section-title">
+                <span data-i18n="appearance">外观</span>
+                <small data-i18n="appearanceHint">默认中文显示，可切换双主题。</small>
+              </div>
+              <div class="choice-grid">
+                <button class="choice active" data-theme-choice="glass">
+                  <strong data-i18n="themeGlass">液态玻璃</strong>
+                  <span data-i18n="themeGlassDesc">透明、柔光、苹果风</span>
+                </button>
+                <button class="choice" data-theme-choice="mono">
+                  <strong data-i18n="themeMono">深色极简</strong>
+                  <span data-i18n="themeMonoDesc">近黑、冷蓝、低亮玻璃</span>
+                </button>
+              </div>
+              <div class="segmented">
+                <button class="segment active" data-lang-choice="zh">中文</button>
+                <button class="segment" data-lang-choice="en">English</button>
+              </div>
+            </section>
+
+            <section class="settings-section">
+              <div class="section-title">
+                <span data-i18n="controller">控制端</span>
+                <small data-i18n="controllerHint">这些信息来自 OpenClash / Mihomo API。</small>
+              </div>
+              <div class="guide-card">
+                <div>
+                  <strong data-i18n="guideTitle">如何找到控制面板地址和密钥</strong>
+                  <p data-i18n="guideIntro">进入 OpenClash 的运行状态页，右侧“控制面板”卡片里可以复制地址和密钥。</p>
+                </div>
+                <ol>
+                  <li data-i18n="guideStep1">打开 OpenWrt / 路由器后台，进入 Services → OpenClash。</li>
+                  <li data-i18n="guideStep2">切到“运行状态”，找到右侧的“控制面板”。</li>
+                  <li data-i18n="guideStep3">复制绿色地址，例如 192.168.9.1:9090，填入路由 IP 和 API 端口。</li>
+                  <li data-i18n="guideStep4">点锁形按钮复制密钥，粘贴到 Secret。也可以直接粘贴 Bearer 文本，应用会自动识别。</li>
+                </ol>
+              </div>
+              <div class="settings-grid">
+                <label>
+                  <span data-i18n="routerIp">路由 IP</span>
+                  <input id="hostInput" placeholder="192.168.9.1" />
+                </label>
+                <label>
+                  <span data-i18n="apiPort">API 端口</span>
+                  <input id="portInput" type="number" placeholder="9090" />
+                </label>
+                <label>
+                  <span>Secret</span>
+                  <input id="secretInput" type="password" placeholder="Bearer token" />
+                </label>
+                <label class="toggle-row">
+                  <span data-i18n="launchAtLogin">开机自启</span>
+                  <input id="launchInput" type="checkbox" />
+                </label>
+              </div>
+              <p id="apiHint"></p>
+            </section>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script src="./renderer.js"></script>
+  </body>
+</html>
