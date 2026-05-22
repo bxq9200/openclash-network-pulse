@@ -20,7 +20,10 @@
     "clash",
     "desktop-widget"
   ],
-  "author": "bxq9200",
+  "author": {
+    "name": "bxq9200",
+    "email": "bxq9200@users.noreply.github.com"
+  },
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -62,6 +65,8 @@
       "category": "public.app-category.utilities"
     },
     "linux": {
+      "icon": "src/assets/logo.png",
+      "maintainer": "bxq9200 <bxq9200@users.noreply.github.com>",
       "target": [
         "AppImage",
         "deb"
