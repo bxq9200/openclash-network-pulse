@@ -9,6 +9,10 @@ on:
 permissions:
   contents: write
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  CSC_IDENTITY_AUTO_DISCOVERY: false
+
 jobs:
   build:
     name: Build ${{ matrix.os }}
@@ -44,6 +48,10 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Install Linux packaging dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libarchive-tools rpm
 
       - name: Build
         run: ${{ matrix.command }}
