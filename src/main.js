@@ -280,6 +280,14 @@ function queueWindowBoundsSave() {
   }, 600);
 }
 
+function broadcastMaximizedState() {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    return;
+  }
+
+  mainWindow.webContents.send('window:maximized-change', mainWindow.isMaximized());
+}
+
 async function createWindow() {
   const config = await readConfig();
   const bounds = config.windowBounds || DEFAULT_CONFIG.windowBounds;
@@ -309,6 +317,10 @@ async function createWindow() {
 
   mainWindow.on('move', queueWindowBoundsSave);
   mainWindow.on('resize', queueWindowBoundsSave);
+  mainWindow.on('maximize', broadcastMaximizedState);
+  mainWindow.on('unmaximize', broadcastMaximizedState);
+  mainWindow.on('enter-full-screen', broadcastMaximizedState);
+  mainWindow.on('leave-full-screen', broadcastMaximizedState);
   mainWindow.on('close', (event) => {
     if (!app.isQuitting) {
       event.preventDefault();
@@ -327,6 +339,21 @@ app.whenReady().then(() => {
   ipcMain.handle('proxy:switch', switchProxy);
   ipcMain.handle('proxy:testDelay', testGroupDelay);
   ipcMain.handle('window:minimize', () => mainWindow?.minimize());
+  ipcMain.handle('window:toggleMaximize', () => {
+    if (!mainWindow) {
+      return false;
+    }
+
+    if (mainWindow.isMaximized()) {
+      mainWindow.unmaximize();
+    } else {
+      mainWindow.maximize();
+    }
+
+    broadcastMaximizedState();
+    return mainWindow.isMaximized();
+  });
+  ipcMain.handle('window:isMaximized', () => Boolean(mainWindow?.isMaximized()));
   ipcMain.handle('window:close', () => mainWindow?.hide());
 
   createTray();

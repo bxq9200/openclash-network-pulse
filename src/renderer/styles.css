@@ -97,6 +97,11 @@ button:hover,
   overflow: hidden;
 }
 
+body.is-maximized .shell {
+  border-radius: 0;
+  border-color: transparent;
+}
+
 body.theme-glass .shell::before {
   content: "";
   position: absolute;
@@ -212,6 +217,19 @@ svg {
 .icon-button {
   display: grid;
   place-items: center;
+}
+
+#maxBtn .restore-icon,
+body:not(.is-maximized) #maxBtn .restore-icon {
+  display: none;
+}
+
+body.is-maximized #maxBtn .max-icon {
+  display: none;
+}
+
+body.is-maximized #maxBtn .restore-icon {
+  display: block;
 }
 
 .sigil {

@@ -488,7 +488,17 @@ document.querySelector('#settingsBtn').addEventListener('click', () => {
   els.settings.classList.toggle('hidden');
 });
 document.querySelector('#minBtn').addEventListener('click', () => api.minimize());
+document.querySelector('#maxBtn').addEventListener('click', async () => {
+  setMaximizedState(await api.toggleMaximize());
+});
 document.querySelector('#closeBtn').addEventListener('click', () => api.close());
+document.querySelector('.titlebar').addEventListener('dblclick', async (event) => {
+  if (event.target.closest('button, input, select, textarea')) {
+    return;
+  }
+
+  setMaximizedState(await api.toggleMaximize());
+});
 document.querySelector('#saveSettingsBtn').addEventListener('click', async () => {
   await api.setConfig({
     host: els.hostInput.value.trim(),
@@ -520,6 +530,18 @@ document.querySelectorAll('[data-lang-choice]').forEach((button) => {
     applyLanguage();
   });
 });
+
+function setMaximizedState(isMaximized) {
+  document.body.classList.toggle('is-maximized', Boolean(isMaximized));
+  const button = document.querySelector('#maxBtn');
+  if (button) {
+    button.title = isMaximized ? 'Restore' : 'Maximize';
+    button.setAttribute('aria-label', button.title);
+  }
+}
+
+api.onMaximizedChange?.(setMaximizedState);
+api.getMaximized?.().then(setMaximizedState).catch(() => {});
 
 applyTheme();
 applyLanguage();

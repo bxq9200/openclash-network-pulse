@@ -1,6 +1,6 @@
 {
   "name": "openclash-desktop-widget",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A cross-platform desktop widget for OpenClash / Mihomo network status and proxy switching.",
   "main": "src/main.js",
   "scripts": {
