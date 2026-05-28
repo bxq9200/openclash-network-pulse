@@ -14,10 +14,10 @@ const DEFAULT_CONFIG = {
   probeUrls: [
     { name: 'Google', url: 'https://www.gstatic.com/generate_204' },
     { name: 'GitHub', url: 'https://github.com' },
-    { name: 'ChatGPT', url: 'https://chat.openai.com' },
+    { name: 'ChatGPT', url: 'https://chatgpt.com/cdn-cgi/trace', proxyProbe: true },
     { name: 'Baidu', url: 'https://www.baidu.com' },
-    { name: 'YouTube', url: 'https://www.youtube.com/generate_204' },
-    { name: 'Claude', url: 'https://claude.ai' }
+    { name: 'YouTube', url: 'https://www.youtube.com/generate_204', proxyProbe: true },
+    { name: 'Claude', url: 'https://claude.ai', proxyProbe: true }
   ]
 };
 
@@ -33,15 +33,25 @@ async function readConfig() {
   try {
     const raw = await fs.readFile(configPath(), 'utf8');
     const config = { ...DEFAULT_CONFIG, ...JSON.parse(raw) };
-    const existingProbeNames = new Set((config.probeUrls || []).map((probe) => probe.name));
-    config.probeUrls = [
-      ...(config.probeUrls || []),
-      ...DEFAULT_CONFIG.probeUrls.filter((probe) => !existingProbeNames.has(probe.name))
-    ];
+    config.probeUrls = mergeProbeUrls(config.probeUrls);
     return config;
   } catch {
     return DEFAULT_CONFIG;
   }
+}
+
+function mergeProbeUrls(savedProbes = []) {
+  const savedByName = new Map(savedProbes.map((probe) => [probe.name, probe]));
+
+  return [
+    ...DEFAULT_CONFIG.probeUrls.map((defaultProbe) => ({
+      ...defaultProbe,
+      ...(savedByName.get(defaultProbe.name) || {}),
+      url: defaultProbe.url,
+      proxyProbe: defaultProbe.proxyProbe
+    })),
+    ...savedProbes.filter((probe) => !DEFAULT_CONFIG.probeUrls.some((defaultProbe) => defaultProbe.name === probe.name))
+  ];
 }
 
 async function writeConfig(config) {
@@ -143,6 +153,46 @@ async function probeUrl(probe) {
   }
 }
 
+function getPrimaryGroup(groups) {
+  return groups.find((group) => group.name.includes('选择') || group.name.toLowerCase().includes('select'))
+    || groups.find((group) => group.name.toLowerCase() === 'global')
+    || groups[0];
+}
+
+async function probeUrlViaProxy(config, probe, proxyName) {
+  if (!proxyName || ['DIRECT', 'REJECT'].includes(proxyName.toUpperCase())) {
+    return probeUrl(probe);
+  }
+
+  const startedAt = performance.now();
+  const apiPath = `/proxies/${encodeURIComponent(proxyName)}/delay?timeout=5000&url=${encodeURIComponent(probe.url)}`;
+
+  try {
+    const payload = await requestJson(config, apiPath, { timeout: 6500 });
+    return {
+      name: probe.name,
+      ok: Number.isFinite(Number(payload?.delay)),
+      ms: Number(payload?.delay ?? Math.round(performance.now() - startedAt))
+    };
+  } catch (error) {
+    return {
+      name: probe.name,
+      ok: false,
+      ms: null,
+      error: error.name === 'AbortError' ? 'timeout' : 'failed'
+    };
+  }
+}
+
+function probeUrls(config, groups = []) {
+  const primaryGroup = getPrimaryGroup(groups);
+  const activeProxy = primaryGroup?.now;
+
+  return Promise.all(config.probeUrls.map((probe) => (
+    probe.proxyProbe ? probeUrlViaProxy(config, probe, activeProxy) : probeUrl(probe)
+  )));
+}
+
 async function getSnapshot() {
   const config = await readConfig();
   const snapshot = {
@@ -156,18 +206,18 @@ async function getSnapshot() {
   };
 
   try {
-    const [version, proxies, connections, probes] = await Promise.all([
+    const [version, proxies, connections] = await Promise.all([
       requestJson(config, '/version'),
       requestJson(config, '/proxies'),
-      requestJson(config, '/connections').catch(() => null),
-      Promise.all(config.probeUrls.map(probeUrl))
+      requestJson(config, '/connections').catch(() => null)
     ]);
+    const groups = normalizeGroups(proxies);
 
     snapshot.api.ok = true;
     snapshot.version = version;
-    snapshot.groups = normalizeGroups(proxies);
+    snapshot.groups = groups;
     snapshot.connections = connections;
-    snapshot.probes = probes;
+    snapshot.probes = await probeUrls(config, groups);
   } catch (error) {
     snapshot.api = {
       ok: false,
@@ -175,7 +225,7 @@ async function getSnapshot() {
       status: error.status,
       message: error.message
     };
-    snapshot.probes = await Promise.all(config.probeUrls.map(probeUrl));
+    snapshot.probes = await probeUrls(config);
   }
 
   return snapshot;
