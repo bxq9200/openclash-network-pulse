@@ -173,6 +173,27 @@
               </div>
               <p id="apiHint"></p>
             </section>
+
+            <section class="settings-section">
+              <div class="section-title">
+                <span data-i18n="updates">软件更新</span>
+                <small data-i18n="updatesHint">启动后自动检查，发现新版本会后台下载。</small>
+              </div>
+              <div class="update-card">
+                <div>
+                  <strong id="updateTitle" data-i18n="updateIdle">当前已是最新版本</strong>
+                  <span id="updateDetail">v--</span>
+                  <div id="updateProgress" class="update-progress hidden">
+                    <span></span>
+                  </div>
+                </div>
+                <div class="update-actions">
+                  <button id="checkUpdateBtn" data-i18n="checkUpdate">检查更新</button>
+                  <button id="installUpdateBtn" class="hidden" data-i18n="installUpdate">重启安装</button>
+                  <button id="openReleaseBtn" data-i18n="openRelease">下载页面</button>
+                </div>
+              </div>
+            </section>
           </div>
         </div>
       </section>

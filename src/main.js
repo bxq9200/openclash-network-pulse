@@ -1,4 +1,5 @@
-const { app, BrowserWindow, ipcMain, Menu, nativeImage, Tray } = require('electron');
+const { app, BrowserWindow, ipcMain, Menu, nativeImage, Tray, shell } = require('electron');
+const { autoUpdater } = require('electron-updater');
 const path = require('node:path');
 const fs = require('node:fs/promises');
 
@@ -24,6 +25,13 @@ const DEFAULT_CONFIG = {
 let mainWindow;
 let tray;
 let saveWindowTimer;
+let updateStatus = {
+  state: 'idle',
+  message: '',
+  info: null,
+  progress: null,
+  error: null
+};
 
 function configPath() {
   return path.join(app.getPath('userData'), 'config.json');
@@ -311,6 +319,84 @@ function createTray() {
   });
 }
 
+function sendUpdateStatus(patch) {
+  updateStatus = {
+    ...updateStatus,
+    ...patch,
+    updatedAt: new Date().toISOString()
+  };
+
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('update:status', updateStatus);
+  }
+
+  return updateStatus;
+}
+
+function setupAutoUpdater() {
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
+  autoUpdater.allowPrerelease = false;
+
+  autoUpdater.on('checking-for-update', () => {
+    sendUpdateStatus({ state: 'checking', message: 'checking', error: null, progress: null });
+  });
+  autoUpdater.on('update-available', (info) => {
+    sendUpdateStatus({ state: 'available', message: 'available', info, error: null, progress: null });
+  });
+  autoUpdater.on('download-progress', (progress) => {
+    sendUpdateStatus({ state: 'downloading', message: 'downloading', progress });
+  });
+  autoUpdater.on('update-downloaded', (info) => {
+    sendUpdateStatus({ state: 'downloaded', message: 'downloaded', info, progress: null });
+  });
+  autoUpdater.on('update-not-available', (info) => {
+    sendUpdateStatus({ state: 'not-available', message: 'not-available', info, progress: null });
+  });
+  autoUpdater.on('error', (error) => {
+    sendUpdateStatus({
+      state: 'error',
+      message: 'error',
+      error: error?.message || String(error),
+      progress: null
+    });
+  });
+}
+
+async function checkForUpdates() {
+  if (!app.isPackaged) {
+    return sendUpdateStatus({
+      state: 'dev',
+      message: 'dev',
+      info: { version: app.getVersion() },
+      progress: null,
+      error: null
+    });
+  }
+
+  try {
+    await autoUpdater.checkForUpdates();
+    return updateStatus;
+  } catch (error) {
+    return sendUpdateStatus({
+      state: 'error',
+      message: 'error',
+      error: error?.message || String(error),
+      progress: null
+    });
+  }
+}
+
+function installUpdate() {
+  if (updateStatus.state !== 'downloaded') {
+    return false;
+  }
+
+  app.isQuitting = true;
+  autoUpdater.quitAndInstall(false, true);
+  return true;
+}
+
 async function persistWindowBounds() {
   if (!mainWindow || mainWindow.isDestroyed()) {
     return;
@@ -382,6 +468,7 @@ async function createWindow() {
 }
 
 app.whenReady().then(() => {
+  setupAutoUpdater();
   readConfig().then((config) => writeConfig(config)).catch(() => {});
   ipcMain.handle('config:get', readConfig);
   ipcMain.handle('config:set', (_, config) => writeConfig(config));
@@ -405,9 +492,18 @@ app.whenReady().then(() => {
   });
   ipcMain.handle('window:isMaximized', () => Boolean(mainWindow?.isMaximized()));
   ipcMain.handle('window:close', () => mainWindow?.hide());
+  ipcMain.handle('update:check', checkForUpdates);
+  ipcMain.handle('update:status', () => updateStatus);
+  ipcMain.handle('update:install', installUpdate);
+  ipcMain.handle('update:openReleases', () => {
+    shell.openExternal('https://github.com/bxq9200/openclash-network-pulse/releases/latest');
+  });
 
   createTray();
   createWindow();
+  setTimeout(() => {
+    checkForUpdates().catch(() => {});
+  }, 6000);
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {

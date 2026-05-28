@@ -12,5 +12,12 @@ contextBridge.exposeInMainWorld('openClashWidget', {
   onMaximizedChange: (callback) => {
     ipcRenderer.on('window:maximized-change', (_, isMaximized) => callback(isMaximized));
   },
+  checkForUpdates: () => ipcRenderer.invoke('update:check'),
+  getUpdateStatus: () => ipcRenderer.invoke('update:status'),
+  installUpdate: () => ipcRenderer.invoke('update:install'),
+  openReleases: () => ipcRenderer.invoke('update:openReleases'),
+  onUpdateStatus: (callback) => {
+    ipcRenderer.on('update:status', (_, status) => callback(status));
+  },
   close: () => ipcRenderer.invoke('window:close')
 });

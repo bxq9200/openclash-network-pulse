@@ -35,6 +35,18 @@ const i18n = {
     apiPort: 'API 端口',
     launchAtLogin: '开机自启',
     save: '保存',
+    updates: '软件更新',
+    updatesHint: '启动后自动检查，发现新版本会后台下载。',
+    updateIdle: '当前已是最新版本',
+    updateChecking: '正在检查更新',
+    updateAvailable: '发现新版本，正在下载',
+    updateDownloading: '正在下载更新',
+    updateDownloaded: '更新已下载，重启后安装',
+    updateDev: '开发模式不检查更新',
+    updateError: '更新检查失败',
+    checkUpdate: '检查更新',
+    installUpdate: '重启安装',
+    openRelease: '下载页面',
     online: '在线',
     offline: '离线',
     unknown: '未知',
@@ -81,6 +93,18 @@ const i18n = {
     apiPort: 'API Port',
     launchAtLogin: 'Launch at login',
     save: 'Save',
+    updates: 'Updates',
+    updatesHint: 'Checks on startup and downloads new releases in the background.',
+    updateIdle: 'You are up to date',
+    updateChecking: 'Checking for updates',
+    updateAvailable: 'Update found, downloading',
+    updateDownloading: 'Downloading update',
+    updateDownloaded: 'Update downloaded, restart to install',
+    updateDev: 'Updates are disabled in development',
+    updateError: 'Update check failed',
+    checkUpdate: 'Check',
+    installUpdate: 'Restart',
+    openRelease: 'Releases',
     online: 'ONLINE',
     offline: 'OFFLINE',
     unknown: 'UNKNOWN',
@@ -118,7 +142,13 @@ const els = {
   apiHint: document.querySelector('#apiHint'),
   healthText: document.querySelector('#healthText'),
   controllerText: document.querySelector('#controllerText'),
-  activeNodeText: document.querySelector('#activeNodeText')
+  activeNodeText: document.querySelector('#activeNodeText'),
+  updateTitle: document.querySelector('#updateTitle'),
+  updateDetail: document.querySelector('#updateDetail'),
+  updateProgress: document.querySelector('#updateProgress'),
+  checkUpdateBtn: document.querySelector('#checkUpdateBtn'),
+  installUpdateBtn: document.querySelector('#installUpdateBtn'),
+  openReleaseBtn: document.querySelector('#openReleaseBtn')
 };
 
 let previousTraffic = null;
@@ -250,6 +280,33 @@ function delayClass(node) {
     return ' warn';
   }
   return ' ok';
+}
+
+function renderUpdateStatus(status = {}) {
+  const stateKey = {
+    idle: 'updateIdle',
+    checking: 'updateChecking',
+    available: 'updateAvailable',
+    downloading: 'updateDownloading',
+    downloaded: 'updateDownloaded',
+    'not-available': 'updateIdle',
+    dev: 'updateDev',
+    error: 'updateError'
+  }[status.state] || 'updateIdle';
+
+  els.updateTitle.textContent = t(stateKey);
+  els.updateTitle.className = status.state === 'error' ? 'bad' : status.state === 'downloaded' ? 'ok' : '';
+  els.installUpdateBtn.classList.toggle('hidden', status.state !== 'downloaded');
+  els.checkUpdateBtn.disabled = ['checking', 'downloading'].includes(status.state);
+
+  const version = status.info?.version ? `v${status.info.version}` : '';
+  const error = status.error ? ` · ${status.error}` : '';
+  const percent = Number(status.progress?.percent || 0);
+  const progressText = status.state === 'downloading' && percent ? ` · ${percent.toFixed(0)}%` : '';
+  els.updateDetail.textContent = `${version || 'v--'}${progressText}${error}`;
+
+  els.updateProgress.classList.toggle('hidden', status.state !== 'downloading');
+  els.updateProgress.querySelector('span').style.width = `${Math.min(Math.max(percent, 0), 100)}%`;
 }
 
 function updateTraffic(connections) {
@@ -510,6 +567,11 @@ document.querySelector('#saveSettingsBtn').addEventListener('click', async () =>
   els.settings.classList.add('hidden');
   await refresh();
 });
+els.checkUpdateBtn.addEventListener('click', async () => {
+  renderUpdateStatus(await api.checkForUpdates());
+});
+els.installUpdateBtn.addEventListener('click', () => api.installUpdate());
+els.openReleaseBtn.addEventListener('click', () => api.openReleases());
 els.groupSearch.addEventListener('input', () => renderGroups());
 els.sortDelayBtn.addEventListener('click', () => {
   sortByDelay = !sortByDelay;
@@ -542,6 +604,8 @@ function setMaximizedState(isMaximized) {
 
 api.onMaximizedChange?.(setMaximizedState);
 api.getMaximized?.().then(setMaximizedState).catch(() => {});
+api.onUpdateStatus?.(renderUpdateStatus);
+api.getUpdateStatus?.().then(renderUpdateStatus).catch(() => {});
 
 applyTheme();
 applyLanguage();
