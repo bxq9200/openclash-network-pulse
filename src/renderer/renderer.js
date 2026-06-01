@@ -15,6 +15,11 @@ const i18n = {
     proxyGroups: '代理策略组',
     search: '搜索策略组或节点',
     delaySort: '延迟排序',
+    chooseNode: '选择节点',
+    nodeSearch: '搜索节点、地区、倍率',
+    allNodes: '全部',
+    nodeCount: '个节点',
+    selectNode: '选择',
     preferences: '偏好设置',
     settingsTitle: '控制台设置',
     settingsDesc: '调整连接信息、界面风格和启动行为。',
@@ -73,6 +78,11 @@ const i18n = {
     proxyGroups: 'Proxy Groups',
     search: 'Search group or node',
     delaySort: 'Delay Sort',
+    chooseNode: 'Choose Node',
+    nodeSearch: 'Search node, region, multiplier',
+    allNodes: 'All',
+    nodeCount: 'nodes',
+    selectNode: 'Select',
     preferences: 'Preferences',
     settingsTitle: 'Console Settings',
     settingsDesc: 'Tune connection details, appearance, and startup behavior.',
@@ -148,7 +158,13 @@ const els = {
   updateProgress: document.querySelector('#updateProgress'),
   checkUpdateBtn: document.querySelector('#checkUpdateBtn'),
   installUpdateBtn: document.querySelector('#installUpdateBtn'),
-  openReleaseBtn: document.querySelector('#openReleaseBtn')
+  openReleaseBtn: document.querySelector('#openReleaseBtn'),
+  nodePicker: document.querySelector('#nodePicker'),
+  nodePickerTitle: document.querySelector('#nodePickerTitle'),
+  nodePickerSubtitle: document.querySelector('#nodePickerSubtitle'),
+  nodeSearchInput: document.querySelector('#nodeSearchInput'),
+  nodeFilters: document.querySelector('#nodeFilters'),
+  nodeList: document.querySelector('#nodeList')
 };
 
 let previousTraffic = null;
@@ -160,6 +176,8 @@ let sortByDelay = localStorage.getItem('sortByDelay') === 'true';
 let delayMap = JSON.parse(localStorage.getItem('delayMap') || '{}');
 let uploadSamples = Array(24).fill(0);
 let downloadSamples = Array(24).fill(0);
+let pickerGroup = null;
+let pickerFilter = 'all';
 
 function t(key) {
   return i18n[uiPrefs.lang]?.[key] || i18n.zh[key] || key;
@@ -198,6 +216,7 @@ function applyLanguage() {
   } else {
     renderGroups();
   }
+  renderNodePicker();
 }
 
 function formatBytes(bytesPerSecond) {
@@ -416,11 +435,102 @@ function sortNodes(nodes, activeNode) {
     });
   }
 
-  if (!sortByDelay && activeNode) {
-    ranked.sort((a, b) => Number(b === activeNode) - Number(a === activeNode));
+  return ranked;
+}
+
+const nodeFilters = [
+  { key: 'all', label: () => t('allNodes'), test: () => true },
+  { key: 'jp', label: () => 'JP 日本', test: (node) => /(^|\b|[^a-z])jp([^a-z]|\b|$)|日本|东京|大阪|japan|tokyo|osaka/i.test(node) },
+  { key: 'hk', label: () => 'HK 香港', test: (node) => /(^|\b|[^a-z])hk([^a-z]|\b|$)|香港|hong\s*kong/i.test(node) },
+  { key: 'sg', label: () => 'SG 新加坡', test: (node) => /(^|\b|[^a-z])sg([^a-z]|\b|$)|新加坡|singapore/i.test(node) },
+  { key: 'tw', label: () => 'TW 台湾', test: (node) => /(^|\b|[^a-z])tw([^a-z]|\b|$)|台湾|臺灣|taiwan/i.test(node) },
+  { key: 'us', label: () => 'US 美国', test: (node) => /(^|\b|[^a-z])us([^a-z]|\b|$)|美国|美國|usa|america|united states/i.test(node) },
+  { key: 'kr', label: () => 'KR 韩国', test: (node) => /(^|\b|[^a-z])kr([^a-z]|\b|$)|韩国|韓國|korea|seoul/i.test(node) },
+  { key: 'eu', label: () => 'EU 欧洲', test: (node) => /(^|\b|[^a-z])(eu|uk|de|fr|nl)([^a-z]|\b|$)|欧洲|歐洲|英国|德國|德国|france|germany|netherlands|europe/i.test(node) },
+  { key: 'direct', label: () => 'DIRECT', test: (node) => /direct/i.test(node) }
+];
+
+function activeFilter() {
+  return nodeFilters.find((filter) => filter.key === pickerFilter) || nodeFilters[0];
+}
+
+function openNodePicker(groupName) {
+  pickerGroup = currentGroups.find((group) => group.name === groupName);
+  if (!pickerGroup) {
+    return;
   }
 
-  return ranked;
+  pickerFilter = 'all';
+  els.nodeSearchInput.value = '';
+  els.nodePicker.classList.remove('hidden');
+  renderNodePicker();
+  requestAnimationFrame(() => els.nodeSearchInput.focus());
+}
+
+function closeNodePicker() {
+  els.nodePicker.classList.add('hidden');
+  pickerGroup = null;
+}
+
+function renderNodePicker() {
+  if (!pickerGroup) {
+    return;
+  }
+
+  const query = els.nodeSearchInput.value.trim().toLowerCase();
+  const filter = activeFilter();
+  let nodes = sortNodes(pickerGroup.all, pickerGroup.now)
+    .filter((node) => filter.test(node))
+    .filter((node) => !query || node.toLowerCase().includes(query));
+
+  if (sortByDelay) {
+    nodes = sortNodes(nodes, pickerGroup.now);
+  }
+
+  els.nodePickerTitle.textContent = pickerGroup.name;
+  els.nodePickerSubtitle.textContent = `${pickerGroup.all.length} ${t('nodeCount')} · ${pickerGroup.now || '--'}`;
+  els.nodeFilters.innerHTML = nodeFilters.map((item) => {
+    const count = pickerGroup.all.filter((node) => item.test(node)).length;
+    return `
+      <button class="node-filter${item.key === pickerFilter ? ' active' : ''}" data-filter="${item.key}">
+        ${escapeHtml(item.label())}<span>${count}</span>
+      </button>
+    `;
+  }).join('');
+
+  els.nodeList.innerHTML = nodes.map((node) => {
+    const active = node === pickerGroup.now ? ' active' : '';
+    const safeNode = escapeHtml(node);
+    const safeDelay = delayLabel(node);
+    return `
+      <button class="node-option${active}" data-node="${encodeURIComponent(node)}" title="${safeNode}">
+        <span class="node-option-main">
+          <strong>${safeNode}</strong>
+          <small>${node === pickerGroup.now ? t('activeNode') : t('selectNode')}</small>
+        </span>
+        <span class="delay${delayClass(node)}">${safeDelay || '--'}</span>
+      </button>
+    `;
+  }).join('') || `<div class="empty-state">${t('noMatch')}</div>`;
+
+  els.nodeFilters.querySelectorAll('.node-filter').forEach((button) => {
+    button.addEventListener('click', () => {
+      pickerFilter = button.dataset.filter;
+      renderNodePicker();
+    });
+  });
+
+  els.nodeList.querySelectorAll('.node-option').forEach((button) => {
+    button.addEventListener('click', async () => {
+      button.disabled = true;
+      await api.switchProxy({
+        group: pickerGroup.name,
+        node: decodeURIComponent(button.dataset.node)
+      });
+      closeNodePicker();
+      await refresh();
+    });
+  });
 }
 
 function getPrimaryGroup(groups) {
@@ -446,7 +556,11 @@ function renderGroups(groups = currentGroups) {
     const card = document.createElement('article');
     card.className = 'group';
 
-    const nodes = sortNodes(group.all, group.now).map((node) => {
+    const previewNodes = [
+      group.now,
+      ...sortNodes(group.all, group.now).filter((node) => node !== group.now)
+    ].filter(Boolean).slice(0, 4);
+    const nodes = previewNodes.map((node) => {
       const active = node === group.now ? ' active' : '';
       const safeNode = escapeHtml(node);
       const safeDelay = delayLabel(node);
@@ -467,6 +581,7 @@ function renderGroups(groups = currentGroups) {
         <button class="test-btn" data-group="${encodeURIComponent(group.name)}" title="Test latency">
           <svg viewBox="0 0 24 24"><path d="M13 2 4 14h7l-1 8 10-13h-7l1-7Z"/></svg>
         </button>
+        <button class="choose-btn" data-group="${encodeURIComponent(group.name)}">${t('chooseNode')}</button>
       </div>
       <div class="nodes">${nodes}</div>
     `;
@@ -481,6 +596,12 @@ function renderGroups(groups = currentGroups) {
         node: decodeURIComponent(button.dataset.node)
       });
       await refresh();
+    });
+  });
+
+  els.groups.querySelectorAll('.choose-btn').forEach((button) => {
+    button.addEventListener('click', () => {
+      openNodePicker(decodeURIComponent(button.dataset.group));
     });
   });
 
@@ -573,10 +694,18 @@ els.checkUpdateBtn.addEventListener('click', async () => {
 els.installUpdateBtn.addEventListener('click', () => api.installUpdate());
 els.openReleaseBtn.addEventListener('click', () => api.openReleases());
 els.groupSearch.addEventListener('input', () => renderGroups());
+els.nodeSearchInput.addEventListener('input', renderNodePicker);
+document.querySelector('#closeNodePickerBtn').addEventListener('click', closeNodePicker);
+els.nodePicker.addEventListener('click', (event) => {
+  if (event.target === els.nodePicker) {
+    closeNodePicker();
+  }
+});
 els.sortDelayBtn.addEventListener('click', () => {
   sortByDelay = !sortByDelay;
   localStorage.setItem('sortByDelay', String(sortByDelay));
   renderGroups();
+  renderNodePicker();
 });
 document.querySelectorAll('[data-theme-choice]').forEach((button) => {
   button.addEventListener('click', () => {
@@ -591,6 +720,11 @@ document.querySelectorAll('[data-lang-choice]').forEach((button) => {
     savePrefs();
     applyLanguage();
   });
+});
+window.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && !els.nodePicker.classList.contains('hidden')) {
+    closeNodePicker();
+  }
 });
 
 function setMaximizedState(isMaximized) {

@@ -101,6 +101,26 @@
         </section>
       </section>
 
+      <section id="nodePicker" class="node-picker hidden">
+        <div class="node-picker-card">
+          <div class="node-picker-head">
+            <div>
+              <span id="nodePickerSubtitle">--</span>
+              <strong id="nodePickerTitle" data-i18n="chooseNode">选择节点</strong>
+            </div>
+            <button id="closeNodePickerBtn" class="icon-button" title="Close" aria-label="Close">
+              <svg viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+            </button>
+          </div>
+          <label class="node-picker-search">
+            <svg viewBox="0 0 24 24"><path d="m21 21-4.3-4.3"/><circle cx="11" cy="11" r="7"/></svg>
+            <input id="nodeSearchInput" data-i18n-placeholder="nodeSearch" placeholder="搜索节点、地区、倍率" />
+          </label>
+          <div id="nodeFilters" class="node-filters"></div>
+          <div id="nodeList" class="node-list"></div>
+        </div>
+      </section>
+
       <section id="settings" class="settings hidden">
         <div class="settings-shell">
           <aside class="settings-side">
