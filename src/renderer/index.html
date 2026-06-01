@@ -108,9 +108,15 @@
               <span id="nodePickerSubtitle">--</span>
               <strong id="nodePickerTitle" data-i18n="chooseNode">选择节点</strong>
             </div>
-            <button id="closeNodePickerBtn" class="icon-button" title="Close" aria-label="Close">
-              <svg viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
-            </button>
+            <div class="node-picker-actions">
+              <button id="testPickerBtn" class="test-picker-btn" title="Test latency">
+                <svg viewBox="0 0 24 24"><path d="M13 2 4 14h7l-1 8 10-13h-7l1-7Z"/></svg>
+                <span data-i18n="testSelectedGroup">测速</span>
+              </button>
+              <button id="closeNodePickerBtn" class="icon-button" title="Close" aria-label="Close">
+                <svg viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+              </button>
+            </div>
           </div>
           <label class="node-picker-search">
             <svg viewBox="0 0 24 24"><path d="m21 21-4.3-4.3"/><circle cx="11" cy="11" r="7"/></svg>

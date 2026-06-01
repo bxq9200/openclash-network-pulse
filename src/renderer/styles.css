@@ -838,6 +838,34 @@ body.theme-mono .nodes button.active {
   white-space: nowrap;
 }
 
+.node-picker-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex: 0 0 auto;
+}
+
+.test-picker-btn {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+  height: 36px;
+  min-width: 86px;
+  padding: 0 12px;
+  color: var(--hot);
+  font-weight: 700;
+}
+
+.test-picker-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.test-picker-btn.testing svg {
+  animation: spin 0.9s linear infinite;
+}
+
 .node-picker-search {
   position: relative;
   display: flex;
@@ -1309,5 +1337,11 @@ body.theme-mono .service-icon {
   50% {
     transform: scale(1.15);
     opacity: 1;
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
   }
 }

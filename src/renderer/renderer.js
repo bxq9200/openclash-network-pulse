@@ -20,6 +20,8 @@ const i18n = {
     allNodes: '全部',
     nodeCount: '个节点',
     selectNode: '选择',
+    testSelectedGroup: '测速',
+    testingNodes: '测速中',
     preferences: '偏好设置',
     settingsTitle: '控制台设置',
     settingsDesc: '调整连接信息、界面风格和启动行为。',
@@ -83,6 +85,8 @@ const i18n = {
     allNodes: 'All',
     nodeCount: 'nodes',
     selectNode: 'Select',
+    testSelectedGroup: 'Test',
+    testingNodes: 'Testing',
     preferences: 'Preferences',
     settingsTitle: 'Console Settings',
     settingsDesc: 'Tune connection details, appearance, and startup behavior.',
@@ -164,7 +168,8 @@ const els = {
   nodePickerSubtitle: document.querySelector('#nodePickerSubtitle'),
   nodeSearchInput: document.querySelector('#nodeSearchInput'),
   nodeFilters: document.querySelector('#nodeFilters'),
-  nodeList: document.querySelector('#nodeList')
+  nodeList: document.querySelector('#nodeList'),
+  testPickerBtn: document.querySelector('#testPickerBtn')
 };
 
 let previousTraffic = null;
@@ -178,6 +183,7 @@ let uploadSamples = Array(24).fill(0);
 let downloadSamples = Array(24).fill(0);
 let pickerGroup = null;
 let pickerFilter = 'all';
+let testingPickerGroup = false;
 
 function t(key) {
   return i18n[uiPrefs.lang]?.[key] || i18n.zh[key] || key;
@@ -489,6 +495,9 @@ function renderNodePicker() {
 
   els.nodePickerTitle.textContent = pickerGroup.name;
   els.nodePickerSubtitle.textContent = `${pickerGroup.all.length} ${t('nodeCount')} · ${pickerGroup.now || '--'}`;
+  els.testPickerBtn.disabled = testingPickerGroup;
+  els.testPickerBtn.classList.toggle('testing', testingPickerGroup);
+  els.testPickerBtn.querySelector('span').textContent = testingPickerGroup ? t('testingNodes') : t('testSelectedGroup');
   els.nodeFilters.innerHTML = nodeFilters.map((item) => {
     const count = pickerGroup.all.filter((node) => item.test(node)).length;
     return `
@@ -531,6 +540,27 @@ function renderNodePicker() {
       await refresh();
     });
   });
+}
+
+async function testPickerGroupDelay() {
+  if (!pickerGroup || testingPickerGroup) {
+    return;
+  }
+
+  testingPickerGroup = true;
+  renderNodePicker();
+  try {
+    const groupName = pickerGroup.name;
+    delayMap = { ...delayMap, ...(await api.testDelay({ group: groupName })) };
+    localStorage.setItem('delayMap', JSON.stringify(delayMap));
+    sortByDelay = true;
+    localStorage.setItem('sortByDelay', String(sortByDelay));
+    pickerGroup = currentGroups.find((group) => group.name === groupName) || pickerGroup;
+    renderGroups();
+  } finally {
+    testingPickerGroup = false;
+    renderNodePicker();
+  }
 }
 
 function getPrimaryGroup(groups) {
@@ -695,6 +725,7 @@ els.installUpdateBtn.addEventListener('click', () => api.installUpdate());
 els.openReleaseBtn.addEventListener('click', () => api.openReleases());
 els.groupSearch.addEventListener('input', () => renderGroups());
 els.nodeSearchInput.addEventListener('input', renderNodePicker);
+els.testPickerBtn.addEventListener('click', testPickerGroupDelay);
 document.querySelector('#closeNodePickerBtn').addEventListener('click', closeNodePicker);
 els.nodePicker.addEventListener('click', (event) => {
   if (event.target === els.nodePicker) {
