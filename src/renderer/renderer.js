@@ -20,7 +20,8 @@ const i18n = {
     daysRemaining: '天后到期',
     expired: '已到期',
     noExpiry: '未提供到期时间',
-    subscriptionUnavailable: '订阅未提供用量信息',
+    subscriptionUnavailable: '未获取到用量，可在设置中填写订阅链接',
+    subscriptionUrl: '订阅链接（用于读取用量）',
     proxyGroups: '代理策略组',
     search: '搜索策略组或节点',
     delaySort: '延迟排序',
@@ -94,7 +95,8 @@ const i18n = {
     daysRemaining: 'days remaining',
     expired: 'Expired',
     noExpiry: 'No expiry provided',
-    subscriptionUnavailable: 'No subscription usage information',
+    subscriptionUnavailable: 'No usage found. Add the subscription URL in Settings.',
+    subscriptionUrl: 'Subscription URL (for usage)',
     proxyGroups: 'Proxy Groups',
     search: 'Search group or node',
     delaySort: 'Delay Sort',
@@ -170,6 +172,7 @@ const els = {
   hostInput: document.querySelector('#hostInput'),
   portInput: document.querySelector('#portInput'),
   secretInput: document.querySelector('#secretInput'),
+  subscriptionUrlInput: document.querySelector('#subscriptionUrlInput'),
   launchInput: document.querySelector('#launchInput'),
   apiHint: document.querySelector('#apiHint'),
   healthText: document.querySelector('#healthText'),
@@ -781,6 +784,7 @@ async function loadSettings() {
   els.hostInput.value = config.host;
   els.portInput.value = config.port;
   els.secretInput.value = config.secret || '';
+  els.subscriptionUrlInput.value = config.subscriptionUrl || '';
   els.launchInput.checked = Boolean(config.launchAtLogin);
 }
 
@@ -805,6 +809,7 @@ document.querySelector('#saveSettingsBtn').addEventListener('click', async () =>
     host: els.hostInput.value.trim(),
     port: Number(els.portInput.value),
     secret: normalizeSecret(els.secretInput.value),
+    subscriptionUrl: els.subscriptionUrlInput.value.trim(),
     launchAtLogin: els.launchInput.checked
   });
   previousTraffic = null;

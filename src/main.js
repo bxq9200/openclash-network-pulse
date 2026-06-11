@@ -7,6 +7,7 @@ const DEFAULT_CONFIG = {
   host: '192.168.9.1',
   port: 9090,
   secret: '',
+  subscriptionUrl: '',
   launchAtLogin: false,
   windowBounds: {
     width: 1120,
@@ -137,7 +138,7 @@ function normalizeSubscriptionUsage(providersPayload) {
   const providers = providersPayload?.providers || {};
   const subscriptions = Object.entries(providers)
     .map(([name, provider]) => {
-      const info = provider?.subscriptionInfo;
+      const info = provider?.subscriptionInfo || provider?.subscription_info || provider?.['subscription-info'];
       if (!info) {
         return null;
       }
@@ -168,6 +169,73 @@ function normalizeSubscriptionUsage(providersPayload) {
     primary: subscriptions[0] || null,
     subscriptions
   };
+}
+
+function parseSubscriptionUserInfo(value, name = 'Subscription') {
+  if (!value) {
+    return null;
+  }
+
+  const fields = Object.fromEntries(
+    value.split(';')
+      .map((part) => part.trim().split('='))
+      .filter(([key, fieldValue]) => key && fieldValue !== undefined)
+      .map(([key, fieldValue]) => [key.toLowerCase(), Number(fieldValue)])
+  );
+  const upload = Number(fields.upload || 0);
+  const download = Number(fields.download || 0);
+  const total = Number(fields.total || 0);
+  const expireRaw = Number(fields.expire || 0);
+
+  if (!total && !upload && !download && !expireRaw) {
+    return null;
+  }
+
+  return {
+    name,
+    upload,
+    download,
+    used: upload + download,
+    total,
+    expireAt: expireRaw > 0 ? new Date(expireRaw > 1e12 ? expireRaw : expireRaw * 1000).toISOString() : null
+  };
+}
+
+async function fetchSubscriptionUsage(config) {
+  if (!config.subscriptionUrl) {
+    return null;
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000);
+  const commonHeaders = {
+    'User-Agent': 'clash.meta',
+    Accept: '*/*'
+  };
+  const request = async (method, headers = {}) => fetch(config.subscriptionUrl, {
+    method,
+    headers: { ...commonHeaders, ...headers },
+    redirect: 'follow',
+    signal: controller.signal
+  });
+
+  try {
+    let response = await request('HEAD');
+    let userInfo = response.headers.get('subscription-userinfo');
+    if (!userInfo) {
+      response = await request('GET', { Range: 'bytes=0-0' });
+      userInfo = response.headers.get('subscription-userinfo');
+    }
+    let name = 'Subscription URL';
+    try {
+      name = new URL(config.subscriptionUrl).hostname;
+    } catch {}
+    return parseSubscriptionUserInfo(userInfo, name);
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 async function probeUrl(probe) {
@@ -252,11 +320,12 @@ async function getSnapshot() {
   };
 
   try {
-    const [version, proxies, connections, providers] = await Promise.all([
+    const [version, proxies, connections, providers, fallbackSubscription] = await Promise.all([
       requestJson(config, '/version'),
       requestJson(config, '/proxies'),
       requestJson(config, '/connections').catch(() => null),
-      requestJson(config, '/providers/proxies').catch(() => null)
+      requestJson(config, '/providers/proxies').catch(() => null),
+      fetchSubscriptionUsage(config)
     ]);
     const groups = normalizeGroups(proxies);
 
@@ -265,6 +334,14 @@ async function getSnapshot() {
     snapshot.groups = groups;
     snapshot.connections = connections;
     snapshot.subscriptionUsage = normalizeSubscriptionUsage(providers);
+    if (!snapshot.subscriptionUsage.available && fallbackSubscription) {
+      snapshot.subscriptionUsage = {
+        available: true,
+        count: 1,
+        primary: fallbackSubscription,
+        subscriptions: [fallbackSubscription]
+      };
+    }
     snapshot.probes = await probeUrls(config, groups);
   } catch (error) {
     snapshot.api = {

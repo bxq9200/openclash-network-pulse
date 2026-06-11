@@ -561,8 +561,8 @@ body.theme-glass .speed-card::after {
 }
 
 .subscription-panel {
-  flex: 1 0 124px;
-  min-height: 124px;
+  flex: 0 0 auto;
+  min-height: 0;
   padding: 12px;
   overflow: hidden;
 }
@@ -651,7 +651,7 @@ body.theme-glass .speed-card::after {
 .subscription-empty {
   display: grid;
   place-items: center;
-  min-height: 70px;
+  min-height: 34px;
   color: var(--muted);
   font-size: 12px;
 }
@@ -1230,6 +1230,10 @@ body.theme-mono .service-icon {
   grid-template-columns: 1fr 0.55fr 1fr auto;
   gap: 10px;
   align-items: end;
+}
+
+.subscription-url-field {
+  grid-column: 1 / -1;
 }
 
 .guide-card {
