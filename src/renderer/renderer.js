@@ -21,6 +21,7 @@ const i18n = {
     expired: '已到期',
     noExpiry: '未提供到期时间',
     subscriptionUnavailable: '未获取到用量，可在设置中填写订阅链接',
+    subscriptionReadFailed: '订阅链接已配置，但暂时无法读取用量',
     subscriptionUrl: '订阅链接（用于读取用量）',
     proxyGroups: '代理策略组',
     search: '搜索策略组或节点',
@@ -96,6 +97,7 @@ const i18n = {
     expired: 'Expired',
     noExpiry: 'No expiry provided',
     subscriptionUnavailable: 'No usage found. Add the subscription URL in Settings.',
+    subscriptionReadFailed: 'Subscription URL is configured, but usage could not be read.',
     subscriptionUrl: 'Subscription URL (for usage)',
     proxyGroups: 'Proxy Groups',
     search: 'Search group or node',
@@ -316,6 +318,7 @@ function renderSubscriptionUsage(usage) {
 
   if (!available) {
     els.subscriptionName.textContent = '--';
+    els.subscriptionUnavailable.textContent = t(usage?.configured ? 'subscriptionReadFailed' : 'subscriptionUnavailable');
     return;
   }
 

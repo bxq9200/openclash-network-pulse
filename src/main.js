@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, Menu, nativeImage, Tray, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, Menu, nativeImage, Tray, shell, net } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const path = require('node:path');
 const fs = require('node:fs/promises');
@@ -212,12 +212,20 @@ async function fetchSubscriptionUsage(config) {
     'User-Agent': 'clash.meta',
     Accept: '*/*'
   };
-  const request = async (method, headers = {}) => fetch(config.subscriptionUrl, {
-    method,
-    headers: { ...commonHeaders, ...headers },
-    redirect: 'follow',
-    signal: controller.signal
-  });
+  const request = async (method, headers = {}) => {
+    const options = {
+      method,
+      headers: { ...commonHeaders, ...headers },
+      redirect: 'follow',
+      signal: controller.signal
+    };
+
+    try {
+      return await net.fetch(config.subscriptionUrl, options);
+    } catch {
+      return fetch(config.subscriptionUrl, options);
+    }
+  };
 
   try {
     let response = await request('HEAD');
@@ -225,6 +233,7 @@ async function fetchSubscriptionUsage(config) {
     if (!userInfo) {
       response = await request('GET', { Range: 'bytes=0-0' });
       userInfo = response.headers.get('subscription-userinfo');
+      response.body?.cancel().catch(() => {});
     }
     let name = 'Subscription URL';
     try {
@@ -315,7 +324,13 @@ async function getSnapshot() {
     groups: [],
     connections: null,
     probes: [],
-    subscriptionUsage: { available: false, count: 0, primary: null, subscriptions: [] },
+    subscriptionUsage: {
+      available: false,
+      configured: Boolean(config.subscriptionUrl),
+      count: 0,
+      primary: null,
+      subscriptions: []
+    },
     updatedAt: new Date().toISOString()
   };
 
@@ -334,9 +349,11 @@ async function getSnapshot() {
     snapshot.groups = groups;
     snapshot.connections = connections;
     snapshot.subscriptionUsage = normalizeSubscriptionUsage(providers);
+    snapshot.subscriptionUsage.configured = Boolean(config.subscriptionUrl);
     if (!snapshot.subscriptionUsage.available && fallbackSubscription) {
       snapshot.subscriptionUsage = {
         available: true,
+        configured: true,
         count: 1,
         primary: fallbackSubscription,
         subscriptions: [fallbackSubscription]
