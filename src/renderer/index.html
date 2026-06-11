@@ -78,6 +78,27 @@
             <strong id="activeNodeText">--</strong>
             <span id="controllerText">--</span>
           </section>
+
+          <section class="subscription-panel">
+            <div class="panel-head">
+              <h2 data-i18n="subscriptionUsage">订阅用量</h2>
+              <span id="subscriptionName">--</span>
+            </div>
+            <div id="subscriptionAvailable" class="subscription-content hidden">
+              <div class="subscription-summary">
+                <strong id="subscriptionPercent">0%</strong>
+                <span id="subscriptionRemaining">--</span>
+              </div>
+              <div class="subscription-progress"><span id="subscriptionProgressBar"></span></div>
+              <div class="subscription-grid">
+                <div><span data-i18n="usedTraffic">已用</span><strong id="subscriptionUsed">--</strong></div>
+                <div><span data-i18n="remainingTraffic">剩余</span><strong id="subscriptionLeft">--</strong></div>
+                <div><span data-i18n="totalTraffic">总量</span><strong id="subscriptionTotal">--</strong></div>
+                <div><span data-i18n="expiresAt">到期</span><strong id="subscriptionExpire">--</strong></div>
+              </div>
+            </div>
+            <div id="subscriptionUnavailable" class="subscription-empty" data-i18n="subscriptionUnavailable">订阅未提供用量信息</div>
+          </section>
         </aside>
 
         <section class="command-panel">

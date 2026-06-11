@@ -133,6 +133,43 @@ function normalizeGroups(proxiesPayload) {
     });
 }
 
+function normalizeSubscriptionUsage(providersPayload) {
+  const providers = providersPayload?.providers || {};
+  const subscriptions = Object.entries(providers)
+    .map(([name, provider]) => {
+      const info = provider?.subscriptionInfo;
+      if (!info) {
+        return null;
+      }
+
+      const upload = Number(info.upload || 0);
+      const download = Number(info.download || 0);
+      const total = Number(info.total || 0);
+      const expireRaw = Number(info.expire || 0);
+      const expireAt = expireRaw > 0
+        ? new Date(expireRaw > 1e12 ? expireRaw : expireRaw * 1000).toISOString()
+        : null;
+
+      return {
+        name,
+        upload,
+        download,
+        used: upload + download,
+        total,
+        expireAt
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.total - a.total || a.name.localeCompare(b.name));
+
+  return {
+    available: subscriptions.length > 0,
+    count: subscriptions.length,
+    primary: subscriptions[0] || null,
+    subscriptions
+  };
+}
+
 async function probeUrl(probe) {
   const startedAt = performance.now();
   const controller = new AbortController();
@@ -210,14 +247,16 @@ async function getSnapshot() {
     groups: [],
     connections: null,
     probes: [],
+    subscriptionUsage: { available: false, count: 0, primary: null, subscriptions: [] },
     updatedAt: new Date().toISOString()
   };
 
   try {
-    const [version, proxies, connections] = await Promise.all([
+    const [version, proxies, connections, providers] = await Promise.all([
       requestJson(config, '/version'),
       requestJson(config, '/proxies'),
-      requestJson(config, '/connections').catch(() => null)
+      requestJson(config, '/connections').catch(() => null),
+      requestJson(config, '/providers/proxies').catch(() => null)
     ]);
     const groups = normalizeGroups(proxies);
 
@@ -225,6 +264,7 @@ async function getSnapshot() {
     snapshot.version = version;
     snapshot.groups = groups;
     snapshot.connections = connections;
+    snapshot.subscriptionUsage = normalizeSubscriptionUsage(providers);
     snapshot.probes = await probeUrls(config, groups);
   } catch (error) {
     snapshot.api = {

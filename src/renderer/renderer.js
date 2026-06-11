@@ -12,6 +12,15 @@ const i18n = {
     controller: '控制端',
     groupTotal: '策略组',
     activeNode: '当前节点',
+    subscriptionUsage: '订阅用量',
+    usedTraffic: '已用',
+    remainingTraffic: '剩余',
+    totalTraffic: '总量',
+    expiresAt: '到期',
+    daysRemaining: '天后到期',
+    expired: '已到期',
+    noExpiry: '未提供到期时间',
+    subscriptionUnavailable: '订阅未提供用量信息',
     proxyGroups: '代理策略组',
     search: '搜索策略组或节点',
     delaySort: '延迟排序',
@@ -77,6 +86,15 @@ const i18n = {
     controller: 'Controller',
     groupTotal: 'Proxy Groups',
     activeNode: 'Active Node',
+    subscriptionUsage: 'Subscription Usage',
+    usedTraffic: 'Used',
+    remainingTraffic: 'Remaining',
+    totalTraffic: 'Total',
+    expiresAt: 'Expires',
+    daysRemaining: 'days remaining',
+    expired: 'Expired',
+    noExpiry: 'No expiry provided',
+    subscriptionUnavailable: 'No subscription usage information',
     proxyGroups: 'Proxy Groups',
     search: 'Search group or node',
     delaySort: 'Delay Sort',
@@ -157,6 +175,16 @@ const els = {
   healthText: document.querySelector('#healthText'),
   controllerText: document.querySelector('#controllerText'),
   activeNodeText: document.querySelector('#activeNodeText'),
+  subscriptionName: document.querySelector('#subscriptionName'),
+  subscriptionAvailable: document.querySelector('#subscriptionAvailable'),
+  subscriptionUnavailable: document.querySelector('#subscriptionUnavailable'),
+  subscriptionPercent: document.querySelector('#subscriptionPercent'),
+  subscriptionRemaining: document.querySelector('#subscriptionRemaining'),
+  subscriptionProgressBar: document.querySelector('#subscriptionProgressBar'),
+  subscriptionUsed: document.querySelector('#subscriptionUsed'),
+  subscriptionLeft: document.querySelector('#subscriptionLeft'),
+  subscriptionTotal: document.querySelector('#subscriptionTotal'),
+  subscriptionExpire: document.querySelector('#subscriptionExpire'),
   updateTitle: document.querySelector('#updateTitle'),
   updateDetail: document.querySelector('#updateDetail'),
   updateProgress: document.querySelector('#updateProgress'),
@@ -240,6 +268,70 @@ function formatBytes(bytesPerSecond) {
   }
 
   return `${value.toFixed(value >= 10 || index === 0 ? 0 : 1)} ${units[index]}`;
+}
+
+function formatStorage(bytes) {
+  if (!Number.isFinite(bytes) || bytes < 0) {
+    return '--';
+  }
+
+  const units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
+  let value = bytes;
+  let index = 0;
+
+  while (value >= 1024 && index < units.length - 1) {
+    value /= 1024;
+    index += 1;
+  }
+
+  const digits = value >= 100 ? 0 : value >= 10 ? 1 : 2;
+  return `${value.toFixed(digits)} ${units[index]}`;
+}
+
+function expiryDetails(expireAt) {
+  if (!expireAt) {
+    return { date: '--', remaining: t('noExpiry') };
+  }
+
+  const expiry = new Date(expireAt);
+  if (Number.isNaN(expiry.getTime())) {
+    return { date: '--', remaining: t('noExpiry') };
+  }
+
+  const days = Math.ceil((expiry.getTime() - Date.now()) / 86400000);
+  return {
+    date: expiry.toLocaleDateString(),
+    remaining: days > 0 ? `${days} ${t('daysRemaining')}` : t('expired')
+  };
+}
+
+function renderSubscriptionUsage(usage) {
+  const primary = usage?.primary;
+  const available = Boolean(usage?.available && primary);
+  els.subscriptionAvailable.classList.toggle('hidden', !available);
+  els.subscriptionUnavailable.classList.toggle('hidden', available);
+
+  if (!available) {
+    els.subscriptionName.textContent = '--';
+    return;
+  }
+
+  const total = Math.max(Number(primary.total || 0), 0);
+  const used = Math.max(Number(primary.used || 0), 0);
+  const left = Math.max(total - used, 0);
+  const percent = total > 0 ? Math.min((used / total) * 100, 100) : 0;
+  const expiry = expiryDetails(primary.expireAt);
+  const extraCount = Math.max(Number(usage.count || 1) - 1, 0);
+
+  els.subscriptionName.textContent = `${primary.name}${extraCount ? ` +${extraCount}` : ''}`;
+  els.subscriptionName.title = primary.name;
+  els.subscriptionPercent.textContent = `${percent.toFixed(percent >= 10 ? 0 : 1)}%`;
+  els.subscriptionRemaining.textContent = expiry.remaining;
+  els.subscriptionProgressBar.style.width = `${percent}%`;
+  els.subscriptionUsed.textContent = formatStorage(used);
+  els.subscriptionLeft.textContent = formatStorage(left);
+  els.subscriptionTotal.textContent = formatStorage(total);
+  els.subscriptionExpire.textContent = expiry.date;
 }
 
 function renderWave(svg, samples) {
@@ -670,6 +762,7 @@ function renderSnapshot(snapshot) {
 
   updateTraffic(snapshot.connections);
   renderProbes(snapshot.probes || []);
+  renderSubscriptionUsage(snapshot.subscriptionUsage);
   renderGroups();
 }
 

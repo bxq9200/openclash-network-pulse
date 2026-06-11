@@ -283,7 +283,8 @@ body.is-maximized #maxBtn .restore-icon {
   flex-direction: column;
   gap: 10px;
   min-height: 0;
-  overflow: hidden;
+  overflow: auto;
+  padding-right: 2px;
 }
 
 .command-panel {
@@ -294,6 +295,7 @@ body.is-maximized #maxBtn .restore-icon {
 .speed-panel,
 .probe-panel,
 .current-node-panel,
+.subscription-panel,
 .command-panel,
 .settings {
   border: 1px solid var(--panel-line);
@@ -556,6 +558,102 @@ body.theme-glass .speed-card::after {
   font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.subscription-panel {
+  flex: 1 0 124px;
+  min-height: 124px;
+  padding: 12px;
+  overflow: hidden;
+}
+
+.subscription-panel .panel-head {
+  margin-bottom: 8px;
+}
+
+.subscription-panel .panel-head > span {
+  max-width: 58%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.subscription-content {
+  display: grid;
+  gap: 8px;
+}
+
+.subscription-summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: baseline;
+}
+
+.subscription-summary strong {
+  color: var(--accent);
+  font-size: 22px;
+}
+
+.subscription-summary span {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.subscription-progress {
+  height: 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.subscription-progress span {
+  display: block;
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--accent), var(--success));
+  transition: width 250ms ease;
+}
+
+.subscription-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.subscription-grid > div {
+  min-width: 0;
+}
+
+.subscription-grid span,
+.subscription-grid strong {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.subscription-grid span {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.subscription-grid strong {
+  margin-top: 3px;
+  color: var(--text);
+  font-size: 11px;
+}
+
+.subscription-empty {
+  display: grid;
+  place-items: center;
+  min-height: 70px;
+  color: var(--muted);
+  font-size: 12px;
 }
 
 .ok {
@@ -977,6 +1075,7 @@ body.theme-mono .speed-panel,
 body.theme-mono .hero-panel,
 body.theme-mono .probe-panel,
 body.theme-mono .current-node-panel,
+body.theme-mono .subscription-panel,
 body.theme-mono .command-panel {
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.055),
