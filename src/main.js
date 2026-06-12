@@ -208,7 +208,10 @@ function parseFormattedSize(value) {
 }
 
 function normalizeOpenClashSubscriptionUsage(payload) {
-  const subscriptions = (payload?.providers || []).map((provider, index) => {
+  const providers = Array.isArray(payload?.providers)
+    ? payload.providers
+    : Object.values(payload?.providers || {});
+  const subscriptions = providers.map((provider, index) => {
     const used = parseFormattedSize(provider.used);
     const total = parseFormattedSize(provider.total);
     const expire = String(provider.expire || '');
