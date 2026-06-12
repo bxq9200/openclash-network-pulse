@@ -23,6 +23,9 @@ const i18n = {
     subscriptionUnavailable: '未获取到用量，可在设置中填写订阅链接',
     subscriptionReadFailed: '订阅链接已配置，但暂时无法读取用量',
     subscriptionUrl: '订阅链接（用于读取用量）',
+    luciUsername: '路由器后台账号',
+    luciPassword: '路由器后台密码',
+    luciPasswordHint: '用于调用 OpenClash 官方用量接口',
     proxyGroups: '代理策略组',
     search: '搜索策略组或节点',
     delaySort: '延迟排序',
@@ -99,6 +102,9 @@ const i18n = {
     subscriptionUnavailable: 'No usage found. Add the subscription URL in Settings.',
     subscriptionReadFailed: 'Subscription URL is configured, but usage could not be read.',
     subscriptionUrl: 'Subscription URL (for usage)',
+    luciUsername: 'Router admin username',
+    luciPassword: 'Router admin password',
+    luciPasswordHint: 'Used for the official OpenClash usage endpoint',
     proxyGroups: 'Proxy Groups',
     search: 'Search group or node',
     delaySort: 'Delay Sort',
@@ -175,6 +181,8 @@ const els = {
   portInput: document.querySelector('#portInput'),
   secretInput: document.querySelector('#secretInput'),
   subscriptionUrlInput: document.querySelector('#subscriptionUrlInput'),
+  luciUsernameInput: document.querySelector('#luciUsernameInput'),
+  luciPasswordInput: document.querySelector('#luciPasswordInput'),
   launchInput: document.querySelector('#launchInput'),
   apiHint: document.querySelector('#apiHint'),
   healthText: document.querySelector('#healthText'),
@@ -788,6 +796,8 @@ async function loadSettings() {
   els.portInput.value = config.port;
   els.secretInput.value = config.secret || '';
   els.subscriptionUrlInput.value = config.subscriptionUrl || '';
+  els.luciUsernameInput.value = config.luciUsername || 'root';
+  els.luciPasswordInput.value = config.luciPassword || '';
   els.launchInput.checked = Boolean(config.launchAtLogin);
 }
 
@@ -813,6 +823,8 @@ document.querySelector('#saveSettingsBtn').addEventListener('click', async () =>
     port: Number(els.portInput.value),
     secret: normalizeSecret(els.secretInput.value),
     subscriptionUrl: els.subscriptionUrlInput.value.trim(),
+    luciUsername: els.luciUsernameInput.value.trim() || 'root',
+    luciPassword: els.luciPasswordInput.value,
     launchAtLogin: els.launchInput.checked
   });
   previousTraffic = null;

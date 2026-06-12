@@ -221,6 +221,14 @@
                   <span data-i18n="subscriptionUrl">订阅链接（用于读取用量）</span>
                   <input id="subscriptionUrlInput" type="password" placeholder="https://example.com/subscribe?token=..." />
                 </label>
+                <label>
+                  <span data-i18n="luciUsername">路由器后台账号</span>
+                  <input id="luciUsernameInput" placeholder="root" />
+                </label>
+                <label class="luci-password-field">
+                  <span data-i18n="luciPassword">路由器后台密码</span>
+                  <input id="luciPasswordInput" type="password" data-i18n-placeholder="luciPasswordHint" placeholder="用于调用 OpenClash 用量接口" />
+                </label>
               </div>
               <p id="apiHint"></p>
             </section>

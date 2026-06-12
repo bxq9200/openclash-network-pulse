@@ -8,6 +8,8 @@ const DEFAULT_CONFIG = {
   port: 9090,
   secret: '',
   subscriptionUrl: '',
+  luciUsername: 'root',
+  luciPassword: '',
   launchAtLogin: false,
   windowBounds: {
     width: 1120,
@@ -171,6 +173,50 @@ function normalizeSubscriptionUsage(providersPayload) {
   };
 }
 
+function parseFormattedSize(value) {
+  if (typeof value === 'number') {
+    return value;
+  }
+  if (!value || typeof value !== 'string') {
+    return 0;
+  }
+
+  const match = value.trim().match(/^(-?[\d.]+)\s*(B|KB|MB|GB|TB|PB)$/i);
+  if (!match) {
+    return 0;
+  }
+  const units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
+  return Number(match[1]) * (1024 ** units.indexOf(match[2].toUpperCase()));
+}
+
+function normalizeOpenClashSubscriptionUsage(payload) {
+  const subscriptions = (payload?.providers || []).map((provider, index) => {
+    const used = parseFormattedSize(provider.used);
+    const total = parseFormattedSize(provider.total);
+    const expire = String(provider.expire || '');
+    const expireDate = expire && expire !== 'null' && !/long-term/i.test(expire)
+      ? new Date(expire.replace(' ', 'T'))
+      : null;
+    const expireAt = expireDate && !Number.isNaN(expireDate.getTime()) ? expireDate.toISOString() : null;
+
+    return {
+      name: provider.provider_name || `Subscription ${index + 1}`,
+      upload: 0,
+      download: 0,
+      used,
+      total,
+      expireAt
+    };
+  }).filter((subscription) => subscription.total || subscription.used || subscription.expireAt);
+
+  return {
+    available: subscriptions.length > 0,
+    count: subscriptions.length,
+    primary: subscriptions[0] || null,
+    subscriptions
+  };
+}
+
 function parseSubscriptionUserInfo(value, name = 'Subscription') {
   if (!value) {
     return null;
@@ -199,6 +245,78 @@ function parseSubscriptionUserInfo(value, name = 'Subscription') {
     total,
     expireAt: expireRaw > 0 ? new Date(expireRaw > 1e12 ? expireRaw : expireRaw * 1000).toISOString() : null
   };
+}
+
+function luciBase(config) {
+  return `http://${config.host}/cgi-bin/luci`;
+}
+
+async function luciFetch(config, pathname, options = {}) {
+  const url = `${luciBase(config)}${pathname}`;
+  const response = await net.fetch(url, {
+    redirect: 'follow',
+    ...options
+  });
+
+  return response;
+}
+
+async function loginLuci(config) {
+  if (!config.luciUsername || !config.luciPassword) {
+    return false;
+  }
+
+  const body = new URLSearchParams({
+    luci_username: config.luciUsername,
+    luci_password: config.luciPassword
+  });
+  const response = await luciFetch(config, '/', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: body.toString()
+  });
+  return response.ok;
+}
+
+async function luciJson(config, pathname) {
+  let response = await luciFetch(config, pathname);
+  let contentType = response.headers.get('content-type') || '';
+
+  if (!response.ok || contentType.includes('text/html')) {
+    const loggedIn = await loginLuci(config);
+    if (!loggedIn) {
+      return null;
+    }
+    response = await luciFetch(config, pathname);
+    contentType = response.headers.get('content-type') || '';
+  }
+
+  if (!response.ok || contentType.includes('text/html')) {
+    return null;
+  }
+  return response.json().catch(() => null);
+}
+
+async function fetchOpenClashSubscriptionUsage(config) {
+  if (!config.luciUsername || !config.luciPassword) {
+    return null;
+  }
+
+  const configInfo = await luciJson(config, '/admin/services/openclash/config_name');
+  const activePath = configInfo?.config_path;
+  if (!activePath) {
+    return null;
+  }
+  const filename = activePath.split('/').pop().replace(/\.(yaml|yml)$/i, '');
+  if (!filename) {
+    return null;
+  }
+
+  const payload = await luciJson(
+    config,
+    `/admin/services/openclash/sub_info_get?filename=${encodeURIComponent(filename)}`
+  );
+  return payload ? normalizeOpenClashSubscriptionUsage(payload) : null;
 }
 
 async function fetchSubscriptionUsage(config) {
@@ -326,7 +444,7 @@ async function getSnapshot() {
     probes: [],
     subscriptionUsage: {
       available: false,
-      configured: Boolean(config.subscriptionUrl),
+      configured: Boolean(config.subscriptionUrl || config.luciPassword),
       count: 0,
       primary: null,
       subscriptions: []
@@ -335,11 +453,12 @@ async function getSnapshot() {
   };
 
   try {
-    const [version, proxies, connections, providers, fallbackSubscription] = await Promise.all([
+    const [version, proxies, connections, providers, openClashSubscription, fallbackSubscription] = await Promise.all([
       requestJson(config, '/version'),
       requestJson(config, '/proxies'),
       requestJson(config, '/connections').catch(() => null),
       requestJson(config, '/providers/proxies').catch(() => null),
+      fetchOpenClashSubscriptionUsage(config).catch(() => null),
       fetchSubscriptionUsage(config)
     ]);
     const groups = normalizeGroups(proxies);
@@ -349,7 +468,13 @@ async function getSnapshot() {
     snapshot.groups = groups;
     snapshot.connections = connections;
     snapshot.subscriptionUsage = normalizeSubscriptionUsage(providers);
-    snapshot.subscriptionUsage.configured = Boolean(config.subscriptionUrl);
+    snapshot.subscriptionUsage.configured = Boolean(config.subscriptionUrl || config.luciPassword);
+    if (!snapshot.subscriptionUsage.available && openClashSubscription?.available) {
+      snapshot.subscriptionUsage = {
+        ...openClashSubscription,
+        configured: true
+      };
+    }
     if (!snapshot.subscriptionUsage.available && fallbackSubscription) {
       snapshot.subscriptionUsage = {
         available: true,

@@ -1236,6 +1236,10 @@ body.theme-mono .service-icon {
   grid-column: 1 / -1;
 }
 
+.luci-password-field {
+  grid-column: span 2;
+}
+
 .guide-card {
   display: grid;
   grid-template-columns: minmax(190px, 0.72fr) minmax(280px, 1fr);
