@@ -1,6 +1,6 @@
 {
   "name": "openclash-desktop-widget",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "A cross-platform desktop widget for OpenClash / Mihomo network status and proxy switching.",
   "main": "src/main.js",
   "scripts": {
@@ -36,6 +36,7 @@
   "build": {
     "appId": "local.openclash.network-pulse",
     "productName": "Network Pulse",
+    "artifactName": "Network-Pulse-${version}-${arch}.${ext}",
     "files": [
       "src/**/*",
       "package.json"
@@ -56,11 +57,15 @@
       ]
     },
     "nsis": {
+      "artifactName": "Network-Pulse-Setup-${version}-${arch}.${ext}",
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "Network Pulse"
+    },
+    "portable": {
+      "artifactName": "Network-Pulse-Portable-${version}-${arch}.${ext}"
     },
     "mac": {
       "target": [
