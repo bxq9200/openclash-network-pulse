@@ -28,6 +28,8 @@ const DEFAULT_CONFIG = {
 let mainWindow;
 let tray;
 let saveWindowTimer;
+let subscriptionUsageCache = null;
+let subscriptionUsageRequest = null;
 let updateStatus = {
   state: 'idle',
   message: '',
@@ -35,6 +37,22 @@ let updateStatus = {
   progress: null,
   error: null
 };
+
+const hasSingleInstanceLock = app.requestSingleInstanceLock();
+if (!hasSingleInstanceLock) {
+  app.quit();
+}
+
+app.on('second-instance', () => {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    return;
+  }
+  if (mainWindow.isMinimized()) {
+    mainWindow.restore();
+  }
+  mainWindow.show();
+  mainWindow.focus();
+});
 
 function configPath() {
   return path.join(app.getPath('userData'), 'config.json');
@@ -253,12 +271,19 @@ function luciBase(config) {
 
 async function luciFetch(config, pathname, options = {}) {
   const url = `${luciBase(config)}${pathname}`;
-  const response = await net.fetch(url, {
-    redirect: 'follow',
-    ...options
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), options.timeout || 8000);
+  const { timeout: _timeout, ...fetchOptions } = options;
 
-  return response;
+  try {
+    return await net.fetch(url, {
+      redirect: 'follow',
+      ...fetchOptions,
+      signal: controller.signal
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 async function loginLuci(config) {
@@ -294,9 +319,9 @@ async function loginLuci(config) {
   }
 }
 
-async function luciJson(config, pathname) {
+async function luciJson(config, pathname, options = {}) {
   try {
-    let response = await luciFetch(config, pathname);
+    let response = await luciFetch(config, pathname, options);
     let contentType = response.headers.get('content-type') || '';
 
     if (!response.ok || contentType.includes('text/html')) {
@@ -304,7 +329,7 @@ async function luciJson(config, pathname) {
       if (!login.ok) {
         return { data: null, diagnostic: login.diagnostic };
       }
-      response = await luciFetch(config, pathname);
+      response = await luciFetch(config, pathname, options);
       contentType = response.headers.get('content-type') || '';
     }
 
@@ -370,7 +395,8 @@ async function fetchOpenClashSubscriptionUsage(config) {
 
   const usageResult = await luciJson(
     config,
-    `/admin/services/openclash/sub_info_get?filename=${encodeURIComponent(filename)}`
+    `/admin/services/openclash/sub_info_get?filename=${encodeURIComponent(filename)}`,
+    { timeout: 30000 }
   );
   if (!usageResult.data) {
     return {
@@ -391,6 +417,78 @@ async function fetchOpenClashSubscriptionUsage(config) {
       urlResult: usageResult.data.url_result
     }
   };
+}
+
+function subscriptionCacheKey(config) {
+  return JSON.stringify({
+    host: config.host,
+    luciUsername: config.luciUsername,
+    luciPassword: config.luciPassword,
+    subscriptionUrl: config.subscriptionUrl
+  });
+}
+
+function emptySubscriptionUsage(config, diagnostic = { stage: 'not-checked' }) {
+  return {
+    available: false,
+    configured: Boolean(config.subscriptionUrl || config.luciPassword),
+    count: 0,
+    primary: null,
+    subscriptions: [],
+    diagnostic
+  };
+}
+
+async function refreshSubscriptionUsage(config, force = false) {
+  const key = subscriptionCacheKey(config);
+  const maxAge = 10 * 60 * 1000;
+  if (!force && subscriptionUsageCache?.key === key && Date.now() - subscriptionUsageCache.updatedAt < maxAge) {
+    return subscriptionUsageCache.usage;
+  }
+  if (subscriptionUsageRequest?.key === key) {
+    return subscriptionUsageRequest.promise;
+  }
+
+  const promise = (async () => {
+    const [openClashResult, directResult] = await Promise.all([
+      fetchOpenClashSubscriptionUsage(config),
+      fetchSubscriptionUsage(config)
+    ]);
+
+    let usage = emptySubscriptionUsage(config, openClashResult?.diagnostic);
+    if (openClashResult?.usage?.available) {
+      usage = {
+        ...openClashResult.usage,
+        configured: true,
+        diagnostic: openClashResult.diagnostic
+      };
+    } else if (directResult) {
+      usage = {
+        available: true,
+        configured: true,
+        count: 1,
+        primary: directResult,
+        subscriptions: [directResult],
+        diagnostic: { stage: 'ok', source: 'subscription-url' }
+      };
+    }
+
+    subscriptionUsageCache = { key, usage, updatedAt: Date.now() };
+    return usage;
+  })().catch((error) => {
+    const usage = emptySubscriptionUsage(config, {
+      stage: error.name === 'AbortError' ? 'request-timeout' : 'request-failed'
+    });
+    subscriptionUsageCache = { key, usage, updatedAt: Date.now() };
+    return usage;
+  }).finally(() => {
+    if (subscriptionUsageRequest?.key === key) {
+      subscriptionUsageRequest = null;
+    }
+  });
+
+  subscriptionUsageRequest = { key, promise };
+  return promise;
 }
 
 async function fetchSubscriptionUsage(config) {
@@ -516,25 +614,16 @@ async function getSnapshot() {
     groups: [],
     connections: null,
     probes: [],
-    subscriptionUsage: {
-      available: false,
-      configured: Boolean(config.subscriptionUrl || config.luciPassword),
-      count: 0,
-      primary: null,
-      subscriptions: [],
-      diagnostic: { stage: 'not-checked' }
-    },
+    subscriptionUsage: emptySubscriptionUsage(config),
     updatedAt: new Date().toISOString()
   };
 
   try {
-    const [version, proxies, connections, providers, openClashSubscription, fallbackSubscription] = await Promise.all([
+    const [version, proxies, connections, providers] = await Promise.all([
       requestJson(config, '/version'),
       requestJson(config, '/proxies'),
       requestJson(config, '/connections').catch(() => null),
-      requestJson(config, '/providers/proxies').catch(() => null),
-      fetchOpenClashSubscriptionUsage(config),
-      fetchSubscriptionUsage(config)
+      requestJson(config, '/providers/proxies').catch(() => null)
     ]);
     const groups = normalizeGroups(proxies);
 
@@ -544,23 +633,12 @@ async function getSnapshot() {
     snapshot.connections = connections;
     snapshot.subscriptionUsage = normalizeSubscriptionUsage(providers);
     snapshot.subscriptionUsage.configured = Boolean(config.subscriptionUrl || config.luciPassword);
-    snapshot.subscriptionUsage.diagnostic = openClashSubscription?.diagnostic || { stage: 'not-checked' };
-    if (!snapshot.subscriptionUsage.available && openClashSubscription?.usage?.available) {
-      snapshot.subscriptionUsage = {
-        ...openClashSubscription.usage,
-        configured: true,
-        diagnostic: openClashSubscription.diagnostic
-      };
-    }
-    if (!snapshot.subscriptionUsage.available && fallbackSubscription) {
-      snapshot.subscriptionUsage = {
-        available: true,
-        configured: true,
-        count: 1,
-        primary: fallbackSubscription,
-        subscriptions: [fallbackSubscription],
-        diagnostic: { stage: 'ok', source: 'subscription-url' }
-      };
+    snapshot.subscriptionUsage.diagnostic = { stage: 'not-checked' };
+    const cacheKey = subscriptionCacheKey(config);
+    if (!snapshot.subscriptionUsage.available && subscriptionUsageCache?.key === cacheKey) {
+      snapshot.subscriptionUsage = subscriptionUsageCache.usage;
+    } else if (!snapshot.subscriptionUsage.available) {
+      refreshSubscriptionUsage(config).catch(() => {});
     }
     snapshot.probes = await probeUrls(config, groups);
   } catch (error) {
@@ -618,6 +696,13 @@ function makeTrayImage() {
   return nativeImage.createFromPath(iconPath);
 }
 
+function quitApplication() {
+  app.isQuitting = true;
+  tray?.destroy();
+  tray = null;
+  app.quit();
+}
+
 function createTray() {
   if (tray) {
     return;
@@ -640,10 +725,7 @@ function createTray() {
     { type: 'separator' },
     {
       label: 'Quit',
-      click: () => {
-        app.isQuitting = true;
-        app.quit();
-      }
+      click: quitApplication
     }
   ]));
   tray.on('double-click', () => {
@@ -794,13 +876,6 @@ async function createWindow() {
   mainWindow.on('unmaximize', broadcastMaximizedState);
   mainWindow.on('enter-full-screen', broadcastMaximizedState);
   mainWindow.on('leave-full-screen', broadcastMaximizedState);
-  mainWindow.on('close', (event) => {
-    if (!app.isQuitting) {
-      event.preventDefault();
-      mainWindow.hide();
-    }
-  });
-
   mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
 }
 
@@ -810,6 +885,7 @@ app.whenReady().then(() => {
   ipcMain.handle('config:get', readConfig);
   ipcMain.handle('config:set', (_, config) => writeConfig(config));
   ipcMain.handle('snapshot:get', getSnapshot);
+  ipcMain.handle('subscription:refresh', async () => refreshSubscriptionUsage(await readConfig(), true));
   ipcMain.handle('proxy:switch', switchProxy);
   ipcMain.handle('proxy:testDelay', testGroupDelay);
   ipcMain.handle('window:minimize', () => mainWindow?.minimize());
@@ -828,7 +904,7 @@ app.whenReady().then(() => {
     return mainWindow.isMaximized();
   });
   ipcMain.handle('window:isMaximized', () => Boolean(mainWindow?.isMaximized()));
-  ipcMain.handle('window:close', () => mainWindow?.hide());
+  ipcMain.handle('window:close', quitApplication);
   ipcMain.handle('update:check', checkForUpdates);
   ipcMain.handle('update:status', () => updateStatus);
   ipcMain.handle('update:install', installUpdate);
@@ -851,6 +927,6 @@ app.whenReady().then(() => {
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
-    app.quit();
+    quitApplication();
   }
 });

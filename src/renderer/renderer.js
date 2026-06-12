@@ -31,6 +31,8 @@ const i18n = {
     subscriptionInfoFailed: 'OpenClash 用量接口调用失败',
     subscriptionNoProviderInfo: 'OpenClash 未找到订阅用量信息',
     subscriptionInvalidResponse: 'OpenClash 用量接口返回了无法识别的数据',
+    subscriptionTimeout: '读取订阅用量超时，请稍后重试',
+    subscriptionRequestFailed: '读取订阅用量时发生错误',
     subscriptionUrl: '订阅链接（用于读取用量）',
     luciUsername: '路由器后台账号',
     luciPassword: '路由器后台密码',
@@ -86,7 +88,7 @@ const i18n = {
     healthPoor: '异常',
     connected: '已连接',
     cannotReach: '无法连接',
-    closeHint: '关闭按钮会隐藏到托盘。',
+    closeHint: '关闭按钮会完全退出应用。',
     secretHint: '如果是 401，请检查 Secret；如果超时，请检查控制端口。'
   },
   en: {
@@ -119,6 +121,8 @@ const i18n = {
     subscriptionInfoFailed: 'The OpenClash usage endpoint failed.',
     subscriptionNoProviderInfo: 'OpenClash did not find subscription usage information.',
     subscriptionInvalidResponse: 'OpenClash returned an unrecognized usage response.',
+    subscriptionTimeout: 'Subscription usage request timed out. Try again later.',
+    subscriptionRequestFailed: 'An error occurred while reading subscription usage.',
     subscriptionUrl: 'Subscription URL (for usage)',
     luciUsername: 'Router admin username',
     luciPassword: 'Router admin password',
@@ -174,7 +178,7 @@ const i18n = {
     healthPoor: 'Issue',
     connected: 'Connected to',
     cannotReach: 'Cannot reach',
-    closeHint: 'Close button hides to tray.',
+    closeHint: 'Close button fully exits the app.',
     secretHint: 'For 401, check Secret. For timeout, check the controller port.'
   }
 };
@@ -244,6 +248,7 @@ let downloadSamples = Array(24).fill(0);
 let pickerGroup = null;
 let pickerFilter = 'all';
 let testingPickerGroup = false;
+let refreshPromise = null;
 
 function t(key) {
   return i18n[uiPrefs.lang]?.[key] || i18n.zh[key] || key;
@@ -352,7 +357,9 @@ function subscriptionDiagnosticText(diagnostic, configured) {
     'router-unreachable': 'subscriptionRouterUnreachable',
     'no-active-config': 'subscriptionNoActiveConfig',
     'no-provider-info': 'subscriptionNoProviderInfo',
-    'invalid-response': 'subscriptionInvalidResponse'
+    'invalid-response': 'subscriptionInvalidResponse',
+    'request-timeout': 'subscriptionTimeout',
+    'request-failed': 'subscriptionRequestFailed'
   }[stage];
 
   if (key) {
@@ -828,13 +835,19 @@ function renderSnapshot(snapshot) {
 }
 
 async function refresh() {
-  try {
-    const snapshot = await api.getSnapshot();
-    renderSnapshot(snapshot);
-  } catch (error) {
-    setText(els.apiStatus, 'ERROR', 'status-pill bad');
-    els.apiHint.textContent = error.message;
-  }
+  if (refreshPromise) return refreshPromise;
+  refreshPromise = (async () => {
+    try {
+      const snapshot = await api.getSnapshot();
+      renderSnapshot(snapshot);
+    } catch (error) {
+      setText(els.apiStatus, 'ERROR', 'status-pill bad');
+      els.apiHint.textContent = error.message;
+    } finally {
+      refreshPromise = null;
+    }
+  })();
+  return refreshPromise;
 }
 
 async function refreshSubscriptionUsage() {
@@ -842,7 +855,7 @@ async function refreshSubscriptionUsage() {
   els.refreshSubscriptionBtn.disabled = true;
   els.subscriptionUnavailable.textContent = t('subscriptionRefreshing');
   try {
-    await refresh();
+    renderSubscriptionUsage(await api.refreshSubscription());
   } finally {
     els.refreshSubscriptionBtn.classList.remove('loading');
     els.refreshSubscriptionBtn.disabled = false;
