@@ -415,9 +415,12 @@ async function fetchOpenClashSubscriptionUsage(config) {
   return {
     usage,
     diagnostic: {
-      stage: usage.available ? 'ok' : 'no-provider-info',
-      source: 'subscription-info',
-      urlResult: usageResult.data.url_result
+      stage: usage.available
+        ? 'ok'
+        : usageResult.data.url_result
+          ? 'usage-header-missing'
+          : 'no-provider-info',
+      source: 'subscription-info'
     }
   };
 }

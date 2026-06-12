@@ -30,6 +30,7 @@ const i18n = {
     subscriptionNoActiveConfig: 'OpenClash 未返回当前配置文件',
     subscriptionInfoFailed: 'OpenClash 用量接口调用失败',
     subscriptionNoProviderInfo: 'OpenClash 未找到订阅用量信息',
+    subscriptionHeaderMissing: '已找到订阅，但订阅服务器未返回用量信息',
     subscriptionInvalidResponse: 'OpenClash 用量接口返回了无法识别的数据',
     subscriptionTimeout: '读取订阅用量超时，请稍后重试',
     subscriptionRequestFailed: '读取订阅用量时发生错误',
@@ -120,6 +121,7 @@ const i18n = {
     subscriptionNoActiveConfig: 'OpenClash did not return an active configuration.',
     subscriptionInfoFailed: 'The OpenClash usage endpoint failed.',
     subscriptionNoProviderInfo: 'OpenClash did not find subscription usage information.',
+    subscriptionHeaderMissing: 'Subscription found, but the server did not return usage information.',
     subscriptionInvalidResponse: 'OpenClash returned an unrecognized usage response.',
     subscriptionTimeout: 'Subscription usage request timed out. Try again later.',
     subscriptionRequestFailed: 'An error occurred while reading subscription usage.',
@@ -357,6 +359,7 @@ function subscriptionDiagnosticText(diagnostic, configured) {
     'router-unreachable': 'subscriptionRouterUnreachable',
     'no-active-config': 'subscriptionNoActiveConfig',
     'no-provider-info': 'subscriptionNoProviderInfo',
+    'usage-header-missing': 'subscriptionHeaderMissing',
     'invalid-response': 'subscriptionInvalidResponse',
     'request-timeout': 'subscriptionTimeout',
     'request-failed': 'subscriptionRequestFailed'
