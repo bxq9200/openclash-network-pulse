@@ -571,11 +571,50 @@ body.theme-glass .speed-card::after {
   margin-bottom: 8px;
 }
 
-.subscription-panel .panel-head > span {
-  max-width: 58%;
+.subscription-head-actions {
+  display: flex;
+  min-width: 0;
+  max-width: 62%;
+  gap: 6px;
+  align-items: center;
+}
+
+.subscription-head-actions > span {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.subscription-refresh-btn {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--panel) 78%, transparent);
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.subscription-refresh-btn svg {
+  width: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+}
+
+.subscription-refresh-btn.loading svg {
+  animation: spin 0.9s linear infinite;
+}
+
+.subscription-refresh-btn:disabled {
+  cursor: wait;
+  opacity: 0.65;
 }
 
 .subscription-content {

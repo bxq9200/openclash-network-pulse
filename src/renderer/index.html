@@ -82,7 +82,12 @@
           <section class="subscription-panel">
             <div class="panel-head">
               <h2 data-i18n="subscriptionUsage">订阅用量</h2>
-              <span id="subscriptionName">--</span>
+              <div class="subscription-head-actions">
+                <span id="subscriptionName">--</span>
+                <button id="refreshSubscriptionBtn" class="subscription-refresh-btn" title="刷新订阅用量" aria-label="刷新订阅用量">
+                  <svg viewBox="0 0 24 24"><path d="M20 6v5h-5"/><path d="M4 18v-5h5"/><path d="M18.5 9A7 7 0 0 0 6.1 6.1L4 8"/><path d="M5.5 15A7 7 0 0 0 17.9 17.9L20 16"/></svg>
+                </button>
+              </div>
             </div>
             <div id="subscriptionAvailable" class="subscription-content hidden">
               <div class="subscription-summary">

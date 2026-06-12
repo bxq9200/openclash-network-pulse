@@ -22,6 +22,15 @@ const i18n = {
     noExpiry: '未提供到期时间',
     subscriptionUnavailable: '未获取到用量，可在设置中填写订阅链接',
     subscriptionReadFailed: '订阅链接已配置，但暂时无法读取用量',
+    subscriptionRefreshing: '正在读取 OpenClash 订阅用量…',
+    subscriptionCredentialsMissing: '请在设置中填写路由器后台账号和密码',
+    subscriptionLoginFailed: '路由器后台登录失败，请检查账号和密码',
+    subscriptionRouterUnreachable: '无法连接路由器后台，请检查路由 IP',
+    subscriptionConfigFailed: '无法读取 OpenClash 当前配置',
+    subscriptionNoActiveConfig: 'OpenClash 未返回当前配置文件',
+    subscriptionInfoFailed: 'OpenClash 用量接口调用失败',
+    subscriptionNoProviderInfo: 'OpenClash 未找到订阅用量信息',
+    subscriptionInvalidResponse: 'OpenClash 用量接口返回了无法识别的数据',
     subscriptionUrl: '订阅链接（用于读取用量）',
     luciUsername: '路由器后台账号',
     luciPassword: '路由器后台密码',
@@ -101,6 +110,15 @@ const i18n = {
     noExpiry: 'No expiry provided',
     subscriptionUnavailable: 'No usage found. Add the subscription URL in Settings.',
     subscriptionReadFailed: 'Subscription URL is configured, but usage could not be read.',
+    subscriptionRefreshing: 'Reading OpenClash subscription usage…',
+    subscriptionCredentialsMissing: 'Add the router admin username and password in Settings.',
+    subscriptionLoginFailed: 'Router admin login failed. Check the username and password.',
+    subscriptionRouterUnreachable: 'Cannot reach the router admin page. Check the router IP.',
+    subscriptionConfigFailed: 'Could not read the active OpenClash configuration.',
+    subscriptionNoActiveConfig: 'OpenClash did not return an active configuration.',
+    subscriptionInfoFailed: 'The OpenClash usage endpoint failed.',
+    subscriptionNoProviderInfo: 'OpenClash did not find subscription usage information.',
+    subscriptionInvalidResponse: 'OpenClash returned an unrecognized usage response.',
     subscriptionUrl: 'Subscription URL (for usage)',
     luciUsername: 'Router admin username',
     luciPassword: 'Router admin password',
@@ -198,6 +216,7 @@ const els = {
   subscriptionLeft: document.querySelector('#subscriptionLeft'),
   subscriptionTotal: document.querySelector('#subscriptionTotal'),
   subscriptionExpire: document.querySelector('#subscriptionExpire'),
+  refreshSubscriptionBtn: document.querySelector('#refreshSubscriptionBtn'),
   updateTitle: document.querySelector('#updateTitle'),
   updateDetail: document.querySelector('#updateDetail'),
   updateProgress: document.querySelector('#updateProgress'),
@@ -318,6 +337,33 @@ function expiryDetails(expireAt) {
   };
 }
 
+function subscriptionDiagnosticText(diagnostic, configured) {
+  const stage = diagnostic?.stage;
+  const source = diagnostic?.source;
+  const suffix = diagnostic?.status ? ` (HTTP ${diagnostic.status})` : '';
+
+  if (!configured) {
+    return t('subscriptionUnavailable');
+  }
+
+  const key = {
+    'credentials-missing': 'subscriptionCredentialsMissing',
+    'login-failed': 'subscriptionLoginFailed',
+    'router-unreachable': 'subscriptionRouterUnreachable',
+    'no-active-config': 'subscriptionNoActiveConfig',
+    'no-provider-info': 'subscriptionNoProviderInfo',
+    'invalid-response': 'subscriptionInvalidResponse'
+  }[stage];
+
+  if (key) {
+    return `${t(key)}${suffix}`;
+  }
+  if (stage === 'endpoint-failed') {
+    return `${t(source === 'config-name' ? 'subscriptionConfigFailed' : 'subscriptionInfoFailed')}${suffix}`;
+  }
+  return t('subscriptionReadFailed');
+}
+
 function renderSubscriptionUsage(usage) {
   const primary = usage?.primary;
   const available = Boolean(usage?.available && primary);
@@ -326,7 +372,8 @@ function renderSubscriptionUsage(usage) {
 
   if (!available) {
     els.subscriptionName.textContent = '--';
-    els.subscriptionUnavailable.textContent = t(usage?.configured ? 'subscriptionReadFailed' : 'subscriptionUnavailable');
+    els.subscriptionUnavailable.textContent = subscriptionDiagnosticText(usage?.diagnostic, usage?.configured);
+    els.subscriptionUnavailable.title = els.subscriptionUnavailable.textContent;
     return;
   }
 
@@ -790,6 +837,18 @@ async function refresh() {
   }
 }
 
+async function refreshSubscriptionUsage() {
+  els.refreshSubscriptionBtn.classList.add('loading');
+  els.refreshSubscriptionBtn.disabled = true;
+  els.subscriptionUnavailable.textContent = t('subscriptionRefreshing');
+  try {
+    await refresh();
+  } finally {
+    els.refreshSubscriptionBtn.classList.remove('loading');
+    els.refreshSubscriptionBtn.disabled = false;
+  }
+}
+
 async function loadSettings() {
   const config = await api.getConfig();
   els.hostInput.value = config.host;
@@ -802,6 +861,7 @@ async function loadSettings() {
 }
 
 document.querySelector('#refreshBtn').addEventListener('click', refresh);
+els.refreshSubscriptionBtn.addEventListener('click', refreshSubscriptionUsage);
 document.querySelector('#settingsBtn').addEventListener('click', () => {
   els.settings.classList.toggle('hidden');
 });

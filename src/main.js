@@ -263,60 +263,134 @@ async function luciFetch(config, pathname, options = {}) {
 
 async function loginLuci(config) {
   if (!config.luciUsername || !config.luciPassword) {
-    return false;
+    return { ok: false, diagnostic: { stage: 'credentials-missing' } };
   }
 
-  const body = new URLSearchParams({
-    luci_username: config.luciUsername,
-    luci_password: config.luciPassword
-  });
-  const response = await luciFetch(config, '/', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: body.toString()
-  });
-  return response.ok;
+  try {
+    const body = new URLSearchParams({
+      luci_username: config.luciUsername,
+      luci_password: config.luciPassword
+    });
+    const response = await luciFetch(config, '/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: body.toString()
+    });
+    return {
+      ok: response.ok,
+      diagnostic: {
+        stage: response.ok ? 'login-submitted' : 'login-failed',
+        status: response.status
+      }
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      diagnostic: {
+        stage: 'router-unreachable',
+        message: error.message
+      }
+    };
+  }
 }
 
 async function luciJson(config, pathname) {
-  let response = await luciFetch(config, pathname);
-  let contentType = response.headers.get('content-type') || '';
+  try {
+    let response = await luciFetch(config, pathname);
+    let contentType = response.headers.get('content-type') || '';
 
-  if (!response.ok || contentType.includes('text/html')) {
-    const loggedIn = await loginLuci(config);
-    if (!loggedIn) {
-      return null;
+    if (!response.ok || contentType.includes('text/html')) {
+      const login = await loginLuci(config);
+      if (!login.ok) {
+        return { data: null, diagnostic: login.diagnostic };
+      }
+      response = await luciFetch(config, pathname);
+      contentType = response.headers.get('content-type') || '';
     }
-    response = await luciFetch(config, pathname);
-    contentType = response.headers.get('content-type') || '';
-  }
 
-  if (!response.ok || contentType.includes('text/html')) {
-    return null;
+    if (!response.ok) {
+      return {
+        data: null,
+        diagnostic: { stage: 'endpoint-failed', status: response.status }
+      };
+    }
+    if (contentType.includes('text/html')) {
+      return {
+        data: null,
+        diagnostic: { stage: 'login-failed', status: response.status }
+      };
+    }
+
+    const data = await response.json().catch(() => null);
+    return {
+      data,
+      diagnostic: { stage: data ? 'ok' : 'invalid-response', status: response.status }
+    };
+  } catch (error) {
+    return {
+      data: null,
+      diagnostic: { stage: 'router-unreachable', message: error.message }
+    };
   }
-  return response.json().catch(() => null);
 }
 
 async function fetchOpenClashSubscriptionUsage(config) {
   if (!config.luciUsername || !config.luciPassword) {
-    return null;
+    return {
+      usage: null,
+      diagnostic: { stage: 'credentials-missing' }
+    };
   }
 
-  const configInfo = await luciJson(config, '/admin/services/openclash/config_name');
-  const activePath = configInfo?.config_path;
+  const configResult = await luciJson(config, '/admin/services/openclash/config_name');
+  if (!configResult.data) {
+    return {
+      usage: null,
+      diagnostic: {
+        ...configResult.diagnostic,
+        source: 'config-name'
+      }
+    };
+  }
+
+  const activePath = configResult.data.config_path;
   if (!activePath) {
-    return null;
+    return {
+      usage: null,
+      diagnostic: { stage: 'no-active-config', source: 'config-name' }
+    };
   }
   const filename = activePath.split('/').pop().replace(/\.(yaml|yml)$/i, '');
   if (!filename) {
-    return null;
+    return {
+      usage: null,
+      diagnostic: { stage: 'no-active-config', source: 'config-name' }
+    };
   }
 
-  const payload = await luciJson(
+  const usageResult = await luciJson(
     config,
     `/admin/services/openclash/sub_info_get?filename=${encodeURIComponent(filename)}`
   );
-  return payload ? normalizeOpenClashSubscriptionUsage(payload) : null;
+  if (!usageResult.data) {
+    return {
+      usage: null,
+      diagnostic: {
+        ...usageResult.diagnostic,
+        source: 'subscription-info'
+      }
+    };
+  }
+
+  const usage = normalizeOpenClashSubscriptionUsage(usageResult.data);
+  return {
+    usage,
+    diagnostic: {
+      stage: usage.available ? 'ok' : 'no-provider-info',
+      source: 'subscription-info',
+      urlResult: usageResult.data.url_result
+    }
+  };
 }
 
 async function fetchSubscriptionUsage(config) {
@@ -447,7 +521,8 @@ async function getSnapshot() {
       configured: Boolean(config.subscriptionUrl || config.luciPassword),
       count: 0,
       primary: null,
-      subscriptions: []
+      subscriptions: [],
+      diagnostic: { stage: 'not-checked' }
     },
     updatedAt: new Date().toISOString()
   };
@@ -458,7 +533,7 @@ async function getSnapshot() {
       requestJson(config, '/proxies'),
       requestJson(config, '/connections').catch(() => null),
       requestJson(config, '/providers/proxies').catch(() => null),
-      fetchOpenClashSubscriptionUsage(config).catch(() => null),
+      fetchOpenClashSubscriptionUsage(config),
       fetchSubscriptionUsage(config)
     ]);
     const groups = normalizeGroups(proxies);
@@ -469,10 +544,12 @@ async function getSnapshot() {
     snapshot.connections = connections;
     snapshot.subscriptionUsage = normalizeSubscriptionUsage(providers);
     snapshot.subscriptionUsage.configured = Boolean(config.subscriptionUrl || config.luciPassword);
-    if (!snapshot.subscriptionUsage.available && openClashSubscription?.available) {
+    snapshot.subscriptionUsage.diagnostic = openClashSubscription?.diagnostic || { stage: 'not-checked' };
+    if (!snapshot.subscriptionUsage.available && openClashSubscription?.usage?.available) {
       snapshot.subscriptionUsage = {
-        ...openClashSubscription,
-        configured: true
+        ...openClashSubscription.usage,
+        configured: true,
+        diagnostic: openClashSubscription.diagnostic
       };
     }
     if (!snapshot.subscriptionUsage.available && fallbackSubscription) {
@@ -481,7 +558,8 @@ async function getSnapshot() {
         configured: true,
         count: 1,
         primary: fallbackSubscription,
-        subscriptions: [fallbackSubscription]
+        subscriptions: [fallbackSubscription],
+        diagnostic: { stage: 'ok', source: 'subscription-url' }
       };
     }
     snapshot.probes = await probeUrls(config, groups);
